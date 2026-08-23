@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowLeft, Check, LoaderCircle, Plus, Search, X } from 'lucide-react'
+import { ArrowLeft, Check, LoaderCircle, Plus, Search, Sparkles, X } from 'lucide-react'
 import { getTitleDetails, searchTitles } from '../services/tmdb'
 import type { LibraryItem, MediaType, SearchResult, WatchStatus } from '../types'
 import { MEDIA_LABELS, STATUS_LABELS } from '../types'
@@ -8,6 +8,13 @@ import { Poster } from './Poster'
 interface AddTitleModalProps {
   onClose: () => void
   onAdd: (item: LibraryItem) => Promise<void>
+}
+
+const REALITY_GENRE_ID = 10764
+
+const inferredMediaType = (result: SearchResult): MediaType => {
+  if (result.mediaType === 'movie') return 'movie'
+  return result.genreIds.includes(REALITY_GENRE_ID) ? 'reality' : 'tv'
 }
 
 export function AddTitleModal({ onClose, onAdd }: AddTitleModalProps) {
@@ -42,7 +49,7 @@ export function AddTitleModal({ onClose, onAdd }: AddTitleModalProps) {
 
   function choose(result: SearchResult) {
     setSelected(result)
-    setMediaType(result.mediaType === 'movie' ? 'movie' : 'tv')
+    setMediaType(inferredMediaType(result))
   }
 
   async function confirm() {
@@ -111,21 +118,15 @@ export function AddTitleModal({ onClose, onAdd }: AddTitleModalProps) {
                 <p className="clamped-overview">{selected.overview || 'Sem sinopse disponível.'}</p>
               </div>
             </div>
-            <fieldset>
-              <legend>Que tipo de título é?</legend>
-              <div className="choice-grid three">
-                {(selected.mediaType === 'movie' ? ['movie'] : ['tv', 'reality']).map((type) => (
-                  <button
-                    type="button"
-                    key={type}
-                    className={mediaType === type ? 'active' : ''}
-                    onClick={() => setMediaType(type as MediaType)}
-                  >
-                    {mediaType === type && <Check size={16} />} {MEDIA_LABELS[type as MediaType]}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
+            <div className="auto-media-type">
+              <span className="auto-media-icon"><Sparkles size={18} /></span>
+              <span><small>TIPO IDENTIFICADO</small><strong>{MEDIA_LABELS[mediaType]}</strong></span>
+              {selected.mediaType === 'tv' && (
+                <button type="button" onClick={() => setMediaType(mediaType === 'reality' ? 'tv' : 'reality')}>
+                  Corrigir para {mediaType === 'reality' ? 'série' : 'reality'}
+                </button>
+              )}
+            </div>
             <fieldset>
               <legend>Em qual lista?</legend>
               <div className="choice-grid three">
@@ -175,7 +176,7 @@ export function AddTitleModal({ onClose, onAdd }: AddTitleModalProps) {
                   <Poster src={result.posterUrl} title={result.title} />
                   <span className="search-result-copy">
                     <strong>{result.title}</strong>
-                    <small>{result.mediaType === 'movie' ? 'Filme' : 'Série / Reality'} · {result.releaseYear ?? '—'}</small>
+                    <small>{MEDIA_LABELS[inferredMediaType(result)]} · {result.releaseYear ?? '—'}</small>
                     <span>{result.overview || 'Sem sinopse disponível.'}</span>
                   </span>
                   <Plus size={20} />

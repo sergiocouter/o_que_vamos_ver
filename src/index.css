@@ -257,6 +257,12 @@ textarea { resize: vertical; line-height: 1.5; }
 .selected-title-summary h3 { margin: 5px 0 2px; font-size: 18px; }
 .selected-title-summary p { font-size: 11px; }
 .clamped-overview { display: -webkit-box; margin-top: 10px; line-height: 1.5; overflow: hidden; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.auto-media-type { display: flex; align-items: center; gap: 11px; min-height: 58px; margin-bottom: 22px; padding: 10px 12px; background: var(--purple-soft); border: 1px solid #c7b6e3; border-radius: 11px; }
+.auto-media-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; color: var(--purple); background: white; border-radius: 10px; }
+.auto-media-type > span:nth-child(2) { display: grid; gap: 2px; }
+.auto-media-type small { color: #8a79a5; font-size: 8px; font-weight: 700; letter-spacing: .1em; }
+.auto-media-type strong { color: var(--purple); font-size: 13px; }
+.auto-media-type button { margin-left: auto; padding: 6px 8px; color: var(--purple); background: transparent; border: 0; font-size: 9px; font-weight: 700; }
 fieldset { padding: 0; margin: 0 0 22px; border: 0; }
 legend { margin-bottom: 9px; color: #46414b; font-size: 12px; font-weight: 700; }
 .choice-grid { display: grid; gap: 8px; }
