@@ -165,6 +165,8 @@ textarea { resize: vertical; line-height: 1.5; }
 .main-insight button { display: inline-flex; align-items: center; gap: 6px; padding: 0; color: white; background: transparent; border: 0; font-size: 11px; font-weight: 700; }
 .insight-art { position: absolute; right: 9%; bottom: 22%; display: grid; place-items: center; width: 78px; height: 78px; color: rgba(255,255,255,.82); transform: rotate(-7deg); }
 .art-disc { position: absolute; width: 95px; height: 95px; border: 1px solid rgba(255,255,255,.16); border-radius: 50%; box-shadow: 0 0 0 17px rgba(255,255,255,.025); }
+.daily-pick-poster { position: absolute; z-index: 1; right: 20px; top: 16px; width: 78px; height: 116px; transform: rotate(4deg); }
+.daily-pick-poster .poster { width: 100%; height: 100%; aspect-ratio: auto; border: 2px solid rgba(255,255,255,.3); box-shadow: 0 12px 24px rgba(26,15,42,.32); }
 .stat-card { display: flex; flex-wrap: wrap; align-content: center; gap: 12px; padding: 19px; background: white; border: 1px solid var(--line); }
 .stat-icon { display: grid; place-items: center; width: 37px; height: 37px; border-radius: 11px; }
 .stat-icon.warm { color: var(--orange); background: var(--orange-soft); }
@@ -355,6 +357,7 @@ legend { margin-bottom: 9px; color: #46414b; font-size: 12px; font-weight: 700; 
   .main-insight { min-height: 158px; padding: 21px; }
   .main-insight > div:first-child { width: 85%; }
   .insight-art { right: -7px; opacity: .52; }
+  .daily-pick-poster { right: -5px; top: 20px; opacity: .5; }
   .stat-card { min-height: 105px; display: grid; justify-items: center; gap: 5px; padding: 12px 5px; text-align: center; }
   .stat-icon { width: 31px; height: 31px; }
   .stat-card > span:nth-child(2) { display: flex; align-items: baseline; gap: 4px; }

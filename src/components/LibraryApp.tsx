@@ -24,6 +24,7 @@ import {
   X,
 } from 'lucide-react'
 import { addItem, listItems, removeItem, updateItem } from '../services/library'
+import { getDailyRecommendation } from '../lib/dailyRecommendation'
 import {
   MEDIA_LABELS,
   STATUS_LABELS,
@@ -72,6 +73,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   const [menuOpen, setMenuOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [recommendationNow, setRecommendationNow] = useState(() => new Date())
 
   useEffect(() => {
     let active = true
@@ -89,6 +91,21 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
     }
     window.addEventListener('beforeinstallprompt', handler)
     return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  useEffect(() => {
+    let timer: number
+    const scheduleNextDay = () => {
+      const now = new Date()
+      const nextDay = new Date(now)
+      nextDay.setHours(24, 0, 1, 0)
+      timer = window.setTimeout(() => {
+        setRecommendationNow(new Date())
+        scheduleNextDay()
+      }, nextDay.getTime() - now.getTime())
+    }
+    scheduleNextDay()
+    return () => window.clearTimeout(timer)
   }, [])
 
   function showToast(message: string) {
@@ -115,9 +132,9 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
       .sort((a, b) => new Date(b.statusChangedAt).getTime() - new Date(a.statusChangedAt).getTime())
   }, [items, mediaFilter, query, view])
 
-  const oldestWaiting = useMemo(
-    () => [...items.filter((item) => item.status === 'watchlist')].sort((a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime())[0],
-    [items],
+  const dailyRecommendation = useMemo(
+    () => getDailyRecommendation(items, recommendationNow),
+    [items, recommendationNow],
   )
 
   async function handleAdd(item: LibraryItem) {
@@ -209,8 +226,8 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
 
           <section className="dashboard-cards">
             <article className="insight-card main-insight">
-              <div><span className="insight-icon"><Sparkles size={19} /></span><span className="eyebrow light">LEMBRETE DO SOFÁ</span><h2>{oldestWaiting ? `${oldestWaiting.title} está esperando faz tempo...` : 'Sua lista está pronta para novas histórias.'}</h2><p>{oldestWaiting ? `Entrou há ${dayDiff(oldestWaiting.addedAt)} dias. Que tal tirar da enrolação hoje?` : 'Adicione um título que alguém indicou.'}</p><button onClick={() => oldestWaiting ? setSelectedItem(oldestWaiting) : setShowAdd(true)}>{oldestWaiting ? 'Ver detalhes' : 'Adicionar agora'} <Play size={15} /></button></div>
-              <div className="insight-art"><span className="art-disc" /><Clapperboard size={54} /></div>
+              <div><span className="insight-icon"><Sparkles size={19} /></span><span className="eyebrow light">INDICAÇÃO DO DIA</span><h2>{dailyRecommendation ? dailyRecommendation.item.title : loading ? 'Escolhendo a indicação de hoje...' : 'Sua lista está pronta para novas histórias.'}</h2><p>{dailyRecommendation?.reason ?? (loading ? 'Um instante enquanto olhamos a lista da casa.' : 'Adicione um título que alguém indicou.')}</p><button onClick={() => dailyRecommendation ? setSelectedItem(dailyRecommendation.item) : setShowAdd(true)}>{dailyRecommendation ? 'Ver indicação' : 'Adicionar agora'} <Play size={15} /></button></div>
+              {dailyRecommendation?.item.posterUrl ? <div className="daily-pick-poster"><Poster src={dailyRecommendation.item.posterUrl} title={dailyRecommendation.item.title} /></div> : <div className="insight-art"><span className="art-disc" /><Clapperboard size={54} /></div>}
             </article>
             <article className="stat-card"><span className="stat-icon warm"><Flame size={20} /></span><span><strong>{counts.watchlist}</strong><small>na fila</small></span><p>{counts.watchlist ? 'Escolham o próximo!' : 'Fila zerada'}</p></article>
             <article className="stat-card"><span className="stat-icon purple"><Play size={20} /></span><span><strong>{counts.watching}</strong><small>em andamento</small></span><p>{counts.watching ? 'Tem história rolando' : 'Nada em andamento'}</p></article>
