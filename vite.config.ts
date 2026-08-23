@@ -30,12 +30,12 @@ export default defineConfig({
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/image\.tmdb\.org\/.*/i,
+            urlPattern: /\/\.netlify\/functions\/tmdb\?action=image/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'tmdb-posters',
               expiration: { maxEntries: 150, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
+              cacheableResponse: { statuses: [200] },
             },
           },
           {

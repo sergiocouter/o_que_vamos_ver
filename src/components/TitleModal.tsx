@@ -3,6 +3,7 @@ import { CalendarDays, Check, Flame, Play, Save, Star, Trash2, X } from 'lucide-
 import { MEDIA_LABELS, STATUS_LABELS, type LibraryItem, type WatchStatus } from '../types'
 import { withNewStatus } from '../services/library'
 import { Poster } from './Poster'
+import { normalizeTmdbImageUrl } from '../services/tmdb'
 
 interface TitleModalProps {
   item: LibraryItem
@@ -64,7 +65,7 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title">
         <button className="icon-button modal-close" onClick={onClose} aria-label="Fechar"><X size={20} /></button>
-        <div className="detail-hero" style={draft.backdropUrl ? { backgroundImage: `linear-gradient(90deg, rgba(18,17,22,.98) 0%, rgba(18,17,22,.72) 55%, rgba(18,17,22,.35)), url(${draft.backdropUrl})` } : undefined}>
+        <div className="detail-hero" style={draft.backdropUrl ? { backgroundImage: `linear-gradient(90deg, rgba(18,17,22,.98) 0%, rgba(18,17,22,.72) 55%, rgba(18,17,22,.35)), url(${normalizeTmdbImageUrl(draft.backdropUrl)})` } : undefined}>
           <Poster src={draft.posterUrl} title={draft.title} className="detail-poster" />
           <div className="detail-title-copy">
             <span className="eyebrow light">{MEDIA_LABELS[draft.mediaType]} · {draft.releaseYear ?? 'ANO NÃO INFORMADO'}</span>

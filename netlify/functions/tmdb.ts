@@ -1,6 +1,8 @@
 import type { Config } from '@netlify/functions'
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3'
+const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p'
+const IMAGE_SIZES = new Set(['w185', 'w342', 'w500', 'w780', 'w1280', 'original'])
 
 function json(body: unknown, status = 200, cache = 'no-store') {
   return new Response(JSON.stringify(body), {
@@ -13,11 +15,35 @@ function json(body: unknown, status = 200, cache = 'no-store') {
 }
 
 export default async function handler(request: Request) {
+  const url = new URL(request.url)
+  const action = url.searchParams.get('action')
+
+  if (action === 'image') {
+    const path = url.searchParams.get('path')
+    const size = url.searchParams.get('size') ?? 'w500'
+    if (!path || !/^\/[A-Za-z0-9_-]+\.(?:jpe?g|png|webp)$/i.test(path) || !IMAGE_SIZES.has(size)) {
+      return json({ error: 'Imagem inválida.' }, 400)
+    }
+
+    try {
+      const response = await fetch(`${TMDB_IMAGE_BASE_URL}/${size}${path}`)
+      if (!response.ok || !response.body) return json({ error: 'Imagem não encontrada.' }, response.status)
+
+      return new Response(response.body, {
+        status: 200,
+        headers: {
+          'content-type': response.headers.get('content-type') ?? 'image/jpeg',
+          'cache-control': 'public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400',
+        },
+      })
+    } catch {
+      return json({ error: 'Não foi possível carregar a imagem.' }, 502)
+    }
+  }
+
   const token = process.env.TMDB_API_TOKEN
   if (!token) return json({ error: 'A chave do catálogo ainda não foi configurada no Netlify.' }, 503)
 
-  const url = new URL(request.url)
-  const action = url.searchParams.get('action')
   let endpoint: URL
 
   if (action === 'search') {

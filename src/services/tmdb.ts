@@ -17,7 +17,17 @@ type TmdbSearchItem = {
 }
 
 const imageUrl = (path?: string | null, size = 'w500') =>
-  path ? `https://image.tmdb.org/t/p/${size}${path}` : undefined
+  path
+    ? `/.netlify/functions/tmdb?action=image&size=${size}&path=${encodeURIComponent(path)}`
+    : undefined
+
+export function normalizeTmdbImageUrl(src?: string) {
+  if (!src) return undefined
+  const match = src.match(
+    /^https:\/\/image\.tmdb\.org\/t\/p\/(w\d+|original)(\/[A-Za-z0-9_-]+\.(?:jpe?g|png|webp))$/i,
+  )
+  return match ? imageUrl(match[2], match[1]) : src
+}
 
 export async function searchTitles(query: string): Promise<SearchResult[]> {
   const response = await fetch(
