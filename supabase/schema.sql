@@ -106,6 +106,13 @@ begin
   if exists (select 1 from public.household_members where user_id = auth.uid()) then
     raise exception 'Você já participa de uma casa.';
   end if;
+  if exists (
+    select 1
+    from public.households
+    where invite_code = upper(trim(household_name))
+  ) then
+    raise exception 'Esse é um código de convite. Escolha "Entrar com código" para participar dessa casa.';
+  end if;
   insert into public.households (name, created_by)
   values (trim(household_name), auth.uid()) returning * into new_household;
   insert into public.household_members (household_id, user_id, role)
