@@ -208,6 +208,7 @@ textarea { resize: vertical; line-height: 1.5; }
 .title-card-copy { padding: 9px 3px 0; }
 .media-line { display: block; margin-bottom: 3px; color: var(--purple); font-size: 8px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .title-card h3 { margin: 0 0 6px; font-size: 13px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .2s; }
+.added-by-line { display: flex; align-items: center; gap: 4px; margin: -1px 0 6px; color: #71657c; font-size: 9px; font-weight: 700; }
 .title-card p { display: flex; align-items: center; gap: 4px; margin: 0; color: #969098; font-size: 9px; }
 .title-card p.waiting-too-long { color: #c25c39; }
 .card-progress { display: flex; align-items: center; gap: 7px; }
@@ -289,6 +290,12 @@ legend { margin-bottom: 9px; color: #46414b; font-size: 12px; font-weight: 700; 
 .status-choice { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .status-choice button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 39px; color: #77717b; background: #faf9f7; border: 1px solid #e4e0dc; border-radius: 9px; font-size: 10px; font-weight: 700; }
 .status-choice button.active { color: var(--purple); background: var(--purple-soft); border-color: #b5a0da; }
+.trailer-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #17131b; border-radius: 12px; box-shadow: 0 8px 24px rgba(28,22,34,.14); }
+.trailer-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.trailer-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; color: var(--muted); font-size: 9px; }
+.trailer-actions > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trailer-actions a { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; color: var(--purple); font-weight: 700; text-decoration: none; }
+.trailer-state { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 105px; padding: 18px; color: var(--muted); background: #f7f5f8; border: 1px dashed #d9d3de; border-radius: 12px; font-size: 10px; text-align: center; }
 .section-heading-line { display: flex; align-items: center; justify-content: space-between; }
 .section-heading-line span { color: var(--purple); font-size: 9px; font-weight: 700; }
 .progress-track { height: 6px; overflow: hidden; background: #eae6ed; border-radius: 10px; }
@@ -396,6 +403,7 @@ legend { margin-bottom: 9px; color: #46414b; font-size: 12px; font-weight: 700; 
   .detail-body { display: block; }
   .detail-main { padding: 24px 20px; }
   .detail-aside { border-top: 1px solid var(--line); border-left: 0; }
+  .trailer-actions { align-items: flex-start; flex-direction: column; }
   .status-choice button { flex-direction: column; gap: 4px; }
   .progress-inputs { flex-wrap: wrap; }
   .modal-footer { position: sticky; bottom: 0; }

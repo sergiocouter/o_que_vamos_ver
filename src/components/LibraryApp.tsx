@@ -20,6 +20,7 @@ import {
   Sparkles,
   Star,
   Tv,
+  UserRoundPlus,
   Users,
   X,
 } from 'lucide-react'
@@ -138,7 +139,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   )
 
   async function handleAdd(item: LibraryItem) {
-    const saved = await addItem(item, household.id, userId)
+    const saved = await addItem(item, household.id, userId, displayName)
     setItems((current) => [saved, ...current])
     showToast(`${saved.title} entrou na lista!`)
   }
@@ -257,6 +258,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
                       <div className="title-card-copy">
                         <span className="media-line">{MEDIA_LABELS[item.mediaType]} {item.releaseYear ? `· ${item.releaseYear}` : ''}</span>
                         <h3>{item.title}</h3>
+                        {item.addedByName && <span className="added-by-line"><UserRoundPlus size={12} /> {item.addedByName.split(' ')[0]}</span>}
                         {item.status === 'watching' && item.mediaType !== 'movie' ? <div className="card-progress"><span><span style={{ width: `${progress}%` }} /></span><small>{item.watchedEpisodes ?? 0}/{item.totalEpisodes ?? '?'} eps.</small></div> : <p className={dayDiff(item.addedAt) > 60 && item.status === 'watchlist' ? 'waiting-too-long' : ''}><Clock3 size={13} /> {waitingLabel(item.statusChangedAt)}</p>}
                       </div>
                     </article>

@@ -65,6 +65,14 @@ type TmdbDetails = {
   seasons?: { season_number: number; name: string; episode_count: number }[]
 }
 
+export type TmdbTrailer = {
+  key: string
+  name: string
+  site: 'YouTube'
+  type: string
+  official: boolean
+}
+
 export async function getTitleDetails(
   tmdbId: number,
   mediaType: Exclude<MediaType, 'reality'> | 'reality',
@@ -75,4 +83,19 @@ export async function getTitleDetails(
   )
   if (!response.ok) return {}
   return (await response.json()) as TmdbDetails
+}
+
+export async function getTitleTrailer(
+  tmdbId: number,
+  mediaType: MediaType,
+  signal?: AbortSignal,
+): Promise<TmdbTrailer | null> {
+  const remoteType = mediaType === 'movie' ? 'movie' : 'tv'
+  const response = await fetch(
+    `/.netlify/functions/tmdb?action=videos&type=${remoteType}&id=${tmdbId}`,
+    { signal },
+  )
+  if (!response.ok) throw new Error('Não foi possível carregar o trailer agora.')
+  const payload = (await response.json()) as { trailer?: TmdbTrailer | null }
+  return payload.trailer ?? null
 }

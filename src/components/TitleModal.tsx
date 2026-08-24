@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { CalendarDays, Check, Flame, Play, Save, Star, Trash2, X } from 'lucide-react'
+import { CalendarDays, Check, ExternalLink, Flame, LoaderCircle, Play, Save, Star, Trash2, UserRoundPlus, X } from 'lucide-react'
 import { MEDIA_LABELS, STATUS_LABELS, type LibraryItem, type WatchStatus } from '../types'
 import { withNewStatus } from '../services/library'
 import { Poster } from './Poster'
-import { normalizeTmdbImageUrl } from '../services/tmdb'
+import { getTitleTrailer, normalizeTmdbImageUrl, type TmdbTrailer } from '../services/tmdb'
 
 interface TitleModalProps {
   item: LibraryItem
@@ -19,12 +19,30 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
   const [draft, setDraft] = useState(item)
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [trailer, setTrailer] = useState<TmdbTrailer | null>(null)
+  const [trailerLoading, setTrailerLoading] = useState(Boolean(item.tmdbId))
+  const [trailerError, setTrailerError] = useState(false)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  useEffect(() => {
+    if (!item.tmdbId) return
+    const controller = new AbortController()
+    getTitleTrailer(item.tmdbId, item.mediaType, controller.signal)
+      .then(setTrailer)
+      .catch((reason: unknown) => {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return
+        setTrailerError(true)
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTrailerLoading(false)
+      })
+    return () => controller.abort()
+  }, [item.mediaType, item.tmdbId])
 
   async function save() {
     setSaving(true)
@@ -88,6 +106,45 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
               </div>
             </section>
 
+            {draft.tmdbId && (
+              <section className="trailer-section">
+                <div className="section-heading-line">
+                  <h3>Trailer</h3>
+                  {trailer?.official && <span>OFICIAL</span>}
+                </div>
+                {trailerLoading ? (
+                  <div className="trailer-state"><LoaderCircle className="spin" size={20} /> Procurando o trailer...</div>
+                ) : trailer ? (
+                  <>
+                    <div className="trailer-frame">
+                      <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailer.key)}?rel=0`}
+                        title={`${trailer.name} — ${draft.title}`}
+                        loading="lazy"
+                        referrerPolicy="strict-origin-when-cross-origin"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    </div>
+                    <div className="trailer-actions">
+                      <span>{trailer.name}</span>
+                      <a
+                        href={`https://www.youtube.com/watch?v=${encodeURIComponent(trailer.key)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Abrir no YouTube <ExternalLink size={13} />
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <div className="trailer-state">
+                    {trailerError ? 'Não foi possível carregar o trailer agora.' : 'O TMDB ainda não tem um trailer para este título.'}
+                  </div>
+                )}
+              </section>
+            )}
+
             {draft.mediaType !== 'movie' && (
               <section>
                 <div className="section-heading-line">
@@ -148,6 +205,7 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
             <h3>Sobre</h3>
             <p>{draft.overview || 'Sem sinopse disponível.'}</p>
             <div className="date-timeline">
+              {draft.addedByName && <span><UserRoundPlus size={17} /><span><small>Adicionado por</small>{draft.addedByName}</span></span>}
               <span><CalendarDays size={17} /><span><small>Entrou na lista</small>{dateLabel(draft.addedAt)}</span></span>
               {draft.startedAt && <span><Play size={17} /><span><small>Começamos</small>{dateLabel(draft.startedAt)}</span></span>}
               {draft.watchedAt && <span><Check size={17} /><span><small>Terminamos</small>{dateLabel(draft.watchedAt)}</span></span>}

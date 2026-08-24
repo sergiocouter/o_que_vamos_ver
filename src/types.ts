@@ -30,6 +30,8 @@ export interface LibraryItem {
   rating?: number
   notes?: string
   recommendedBy?: string
+  addedById?: string
+  addedByName?: string
   addedAt: string
   statusChangedAt: string
   startedAt?: string

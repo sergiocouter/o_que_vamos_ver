@@ -25,13 +25,14 @@ type TitleRow = {
   rating: number | null
   notes: string | null
   recommended_by: string | null
+  added_by: string | null
   added_at: string
   status_changed_at: string
   started_at: string | null
   watched_at: string | null
 }
 
-function fromRow(row: TitleRow): LibraryItem {
+function fromRow(row: TitleRow, addedByName?: string): LibraryItem {
   return {
     id: row.id,
     householdId: row.household_id,
@@ -53,6 +54,8 @@ function fromRow(row: TitleRow): LibraryItem {
     rating: row.rating ?? undefined,
     notes: row.notes ?? undefined,
     recommendedBy: row.recommended_by ?? undefined,
+    addedById: row.added_by ?? undefined,
+    addedByName,
     addedAt: row.added_at,
     statusChangedAt: row.status_changed_at,
     startedAt: row.started_at ?? undefined,
@@ -164,16 +167,32 @@ export async function listItems(householdId: string): Promise<LibraryItem[]> {
     .eq('household_id', householdId)
     .order('status_changed_at', { ascending: false })
   if (error) throw error
-  return (data as TitleRow[]).map(fromRow)
+  const rows = data as TitleRow[]
+  const profileIds = [...new Set(rows.flatMap((row) => (row.added_by ? [row.added_by] : [])))]
+  const namesById = new Map<string, string>()
+
+  if (profileIds.length) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, display_name')
+      .in('id', profileIds)
+    if (profilesError) throw profilesError
+    for (const profile of profiles as { id: string; display_name: string }[]) {
+      namesById.set(profile.id, profile.display_name)
+    }
+  }
+
+  return rows.map((row) => fromRow(row, row.added_by ? namesById.get(row.added_by) : undefined))
 }
 
 export async function addItem(
   item: LibraryItem,
   householdId: string,
   userId?: string,
+  addedByName?: string,
 ): Promise<LibraryItem> {
   if (!supabase) {
-    const saved = { ...item, id: crypto.randomUUID() }
+    const saved = { ...item, id: crypto.randomUUID(), addedByName }
     setDemoItems([saved, ...getDemoItems()])
     return saved
   }
@@ -183,7 +202,7 @@ export async function addItem(
     .select()
     .single()
   if (error) throw error
-  return fromRow(data as TitleRow)
+  return fromRow(data as TitleRow, addedByName)
 }
 
 export async function updateItem(
@@ -203,7 +222,7 @@ export async function updateItem(
     .select()
     .single()
   if (error) throw error
-  return fromRow(data as TitleRow)
+  return fromRow(data as TitleRow, item.addedByName)
 }
 
 export async function removeItem(itemId: string, householdId: string) {
