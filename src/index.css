@@ -58,6 +58,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .segmented button { flex: 1; padding: 10px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font-weight: 700; }
 .segmented button.active { color: var(--ink); background: white; box-shadow: 0 2px 7px rgba(30,25,40,.08); }
 .setup-tabs { margin-top: 27px; }
+.setup-choice-hint { margin: 18px 8px 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.setup-choice-hint strong { color: var(--ink); }
 label { display: grid; gap: 7px; color: #46414b; font-size: 13px; font-weight: 700; }
 input, textarea, select { color: var(--ink); background: white; border: 1px solid #dedad5; }
 input, textarea { width: 100%; padding: 12px 14px; border-radius: 10px; }

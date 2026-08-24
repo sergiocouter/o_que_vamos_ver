@@ -8,13 +8,14 @@ interface HouseholdSetupProps {
 }
 
 export function HouseholdSetup({ onReady }: HouseholdSetupProps) {
-  const [mode, setMode] = useState<'create' | 'join'>('create')
+  const [mode, setMode] = useState<'create' | 'join' | null>(null)
   const [value, setValue] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
+    if (!mode) return
     setLoading(true)
     setError(null)
     try {
@@ -40,28 +41,56 @@ export function HouseholdSetup({ onReady }: HouseholdSetupProps) {
           Crie a lista da sua casa ou entre na lista de alguém da família.
         </p>
         <div className="segmented setup-tabs">
-          <button className={mode === 'create' ? 'active' : ''} onClick={() => setMode('create')}>Criar uma casa</button>
-          <button className={mode === 'join' ? 'active' : ''} onClick={() => setMode('join')}>Usar convite</button>
-        </div>
-        <form onSubmit={submit}>
-          <label>
-            {mode === 'create' ? 'Nome da casa' : 'Código do convite'}
-            <span className="input-with-icon">
-              {mode === 'create' ? <Home size={18} /> : <KeyRound size={18} />}
-              <input
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
-                placeholder={mode === 'create' ? 'Ex.: Casa Silva' : 'Ex.: SOFA26'}
-                required
-              />
-            </span>
-          </label>
-          {error && <p className="form-message">{error}</p>}
-          <button className="primary-button" disabled={loading}>
-            {loading ? <LoaderCircle className="spin" size={18} /> : null}
-            Continuar <ArrowRight size={18} />
+          <button
+            type="button"
+            className={mode === 'create' ? 'active' : ''}
+            onClick={() => {
+              setMode('create')
+              setValue('')
+              setError(null)
+            }}
+          >
+            Criar nova casa
           </button>
-        </form>
+          <button
+            type="button"
+            className={mode === 'join' ? 'active' : ''}
+            onClick={() => {
+              setMode('join')
+              setValue('')
+              setError(null)
+            }}
+          >
+            Entrar com código
+          </button>
+        </div>
+        {!mode && (
+          <p className="setup-choice-hint">
+            Se alguém da família já criou a casa, escolha <strong>Entrar com código</strong>.
+          </p>
+        )}
+        {mode && (
+          <form onSubmit={submit}>
+            <label>
+              {mode === 'create' ? 'Nome da nova casa' : 'Código do convite recebido'}
+              <span className="input-with-icon">
+                {mode === 'create' ? <Home size={18} /> : <KeyRound size={18} />}
+                <input
+                  value={value}
+                  onChange={(event) => setValue(event.target.value)}
+                  placeholder={mode === 'create' ? 'Ex.: Casa Silva' : 'Ex.: SOFA26'}
+                  autoCapitalize={mode === 'join' ? 'characters' : undefined}
+                  required
+                />
+              </span>
+            </label>
+            {error && <p className="form-message">{error}</p>}
+            <button className="primary-button" disabled={loading}>
+              {loading ? <LoaderCircle className="spin" size={18} /> : null}
+              {mode === 'create' ? 'Criar casa' : 'Entrar na casa'} <ArrowRight size={18} />
+            </button>
+          </form>
+        )}
       </div>
     </main>
   )
