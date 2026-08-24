@@ -109,7 +109,7 @@ begin
   if exists (
     select 1
     from public.households
-    where invite_code = upper(trim(household_name))
+    where invite_code = upper(regexp_replace(household_name, '[[:space:]]', '', 'g'))
   ) then
     raise exception 'Esse é um código de convite. Escolha "Entrar com código" para participar dessa casa.';
   end if;
@@ -130,7 +130,9 @@ begin
   if exists (select 1 from public.household_members where user_id = auth.uid()) then
     raise exception 'Você já participa de uma casa.';
   end if;
-  select * into selected_household from public.households where households.invite_code = upper(trim(code));
+  select * into selected_household
+  from public.households
+  where households.invite_code = upper(regexp_replace(code, '[[:space:]]', '', 'g'));
   if selected_household.id is null then raise exception 'Código de convite não encontrado.'; end if;
   insert into public.household_members (household_id, user_id)
   values (selected_household.id, auth.uid());

@@ -139,9 +139,13 @@ export async function createHousehold(name: string): Promise<Household> {
 
 export async function joinHousehold(inviteCode: string): Promise<Household> {
   if (!supabase)
-    return { id: 'demo', name: 'Casa da família', inviteCode: inviteCode.toUpperCase() }
+    return {
+      id: 'demo',
+      name: 'Casa da família',
+      inviteCode: inviteCode.replace(/\s+/g, '').toUpperCase(),
+    }
   const { data, error } = await supabase.rpc('join_household', {
-    code: inviteCode.trim().toUpperCase(),
+    code: inviteCode.replace(/\s+/g, '').toUpperCase(),
   })
   if (error) throw error
   const row = (Array.isArray(data) ? data[0] : data) as {
