@@ -12,6 +12,7 @@ PWA familiar para guardar filmes, séries e realities que queremos assistir. A l
 - Progresso geral e temporada por temporada para séries e realities.
 - Termômetro de 1 a 5, notas da família e indicação de quem recomendou.
 - Filtros, pesquisa na lista e lembrete para títulos “enrolados”.
+- Lembrete diário por notificação com um título sorteado da lista **Tem que ver**.
 - Layout responsivo e instalação como aplicativo no celular.
 - Modo de demonstração local quando o Supabase ainda não está configurado.
 
@@ -81,6 +82,22 @@ O token fica somente na Netlify Function e não é enviado ao navegador.
    - `TMDB_API_TOKEN`
 4. Faça o deploy e atualize os endereços autorizados no Supabase/Google com o domínio final.
 
+## 5. Lembrete diário (notificação push)
+
+Todo dia às 19h (Brasília), quem ativou o lembrete recebe um título sorteado da lista **Tem que ver** da casa, sem repetir até passar por todos. Tocar na notificação abre o título no app.
+
+1. No **SQL Editor** do Supabase, execute [`supabase/migrations/2026-10-18-lembrete-diario.sql`](supabase/migrations/2026-10-18-lembrete-diario.sql) (projetos novos já recebem isso pelo `schema.sql`).
+2. Gere um par de chaves VAPID com `npx web-push generate-vapid-keys` e cadastre no Netlify:
+   - `VAPID_PUBLIC_KEY` e `VITE_VAPID_PUBLIC_KEY` (a mesma chave pública)
+   - `VAPID_PRIVATE_KEY`
+   - `VAPID_SUBJECT` = `mailto:seu-email`
+3. Cadastre `SUPABASE_SERVICE_ROLE_KEY` (Supabase > Project Settings > API > `service_role`). Ela é secreta e fica só na função.
+4. Faça o deploy. No app, cada pessoa ativa em **Lembrete diário às 19h**, no menu lateral.
+
+Para testar sem esperar as 19h: Netlify > **Logs & metrics > Functions > daily-reminder > Run now**. A função manda no máximo um lembrete por casa por dia.
+
+No iPhone, o push só funciona com o app instalado na tela de início (iOS 16.4+).
+
 ## Instalar no celular
 
 - **Android/Chrome:** abra o site e toque em **Instalar aplicativo** ou use o menu > **Adicionar à tela inicial**.
@@ -101,6 +118,7 @@ O token fica somente na Netlify Function e não é enviado ao navegador.
 ```bash
 npm run dev      # desenvolvimento
 npm run lint     # análise estática
+npm test         # testes do lembrete diário (node --test)
 npm run build    # build de produção + PWA
 npm run preview  # prévia do build
 ```
