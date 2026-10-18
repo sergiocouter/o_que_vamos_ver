@@ -132,6 +132,17 @@ textarea { resize: vertical; line-height: 1.5; }
 .install-card > span:last-child { display: grid; gap: 2px; }
 .install-card strong { font-size: 11px; }
 .install-card small { color: #7e7884; font-size: 9px; }
+.reminder-card { display: flex; align-items: center; gap: 9px; width: 100%; margin-bottom: 8px; padding: 11px; color: #d4ced9; background: #2a2630; border: 1px solid #39343f; border-radius: 11px; text-align: left; }
+.reminder-card > span:first-child { display: grid; flex: 0 0 32px; place-items: center; height: 32px; color: #7e7884; background: #34303a; border-radius: 9px; }
+.reminder-card.on > span:first-child { color: #ae8fe9; background: #3c3249; }
+.reminder-card > span:nth-child(2) { display: grid; flex: 1; gap: 2px; }
+.reminder-card strong { font-size: 11px; }
+.reminder-card small { color: #7e7884; font-size: 9px; line-height: 1.35; }
+.reminder-card:disabled { cursor: default; opacity: .8; }
+.reminder-switch { position: relative; flex: 0 0 30px; height: 17px; background: #46404d; border-radius: 10px; transition: background .2s; }
+.reminder-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; background: #d4ced9; border-radius: 50%; transition: transform .2s; }
+.reminder-card.on .reminder-switch { background: var(--purple); }
+.reminder-card.on .reminder-switch::after { transform: translateX(13px); background: white; }
 .user-card { display: flex; align-items: center; gap: 9px; padding: 12px 5px 0; border-top: 1px solid #322e37; }
 .avatar { display: grid; place-items: center; flex: 0 0 34px; height: 34px; color: white; background: linear-gradient(145deg, #d38654, #985b3e); border-radius: 50%; font-weight: 800; }
 .user-card > span:nth-child(2) { display: grid; flex: 1; min-width: 0; }

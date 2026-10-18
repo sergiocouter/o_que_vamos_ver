@@ -37,6 +37,7 @@ import {
 } from '../types'
 import { AddTitleModal } from './AddTitleModal'
 import { Poster } from './Poster'
+import { ReminderToggle } from './ReminderToggle'
 import { TitleModal } from './TitleModal'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -53,6 +54,10 @@ interface LibraryAppProps {
 }
 
 type View = 'all' | WatchStatus
+
+const clearTitleParam = () => {
+  if (new URLSearchParams(window.location.search).has('titulo')) window.history.replaceState(null, '', window.location.pathname)
+}
 
 const addedLabel = (value: string) => {
   const when = relativeTime(value)
@@ -75,7 +80,17 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   useEffect(() => {
     let active = true
     listItems(household.id)
-      .then((data) => active && setItems(data))
+      .then((data) => {
+        if (!active) return
+        setItems(data)
+        // Notificação do lembrete diário abre /?titulo=<id>. O parâmetro fica na URL enquanto o título
+        // está aberto, para sobreviver ao recarregamento da atualização automática do PWA.
+        const titleId = new URLSearchParams(window.location.search).get('titulo')
+        if (!titleId) return
+        const target = data.find((item) => item.id === titleId)
+        if (target) setSelectedItem(target)
+        else clearTitleParam()
+      })
       .catch(() => showToast('Não foi possível carregar a lista.'))
       .finally(() => active && setLoading(false))
     return () => { active = false }
@@ -104,6 +119,11 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
     scheduleNextDay()
     return () => window.clearTimeout(timer)
   }, [])
+
+  function closeDetail() {
+    setSelectedItem(null)
+    clearTitleParam()
+  }
 
   function showToast(message: string) {
     setToast(message)
@@ -149,7 +169,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   async function handleDelete(item: LibraryItem) {
     await removeItem(item.id, household.id)
     setItems((current) => current.filter((entry) => entry.id !== item.id))
-    setSelectedItem(null)
+    closeDetail()
     showToast(`${item.title} foi removido.`)
   }
 
@@ -198,6 +218,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
           <div className="invite-chip"><KeyRound size={14} /> convite: <strong>{household.inviteCode}</strong></div>
         </div>
         <div className="sidebar-spacer" />
+        {!isDemo && <ReminderToggle />}
         <button className="install-card" onClick={installApp}><span><Download size={18} /></span><span><strong>Instalar aplicativo</strong><small>Tenha a lista sempre à mão</small></span></button>
         <div className="user-card">
           <span className="avatar">{displayName.slice(0, 1).toUpperCase()}</span>
@@ -279,7 +300,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
       </nav>
 
       {showAdd && <AddTitleModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />}
-      {selectedItem && <TitleModal item={selectedItem} onClose={() => setSelectedItem(null)} onSave={handleSave} onDelete={handleDelete} />}
+      {selectedItem && <TitleModal item={selectedItem} onClose={closeDetail} onSave={handleSave} onDelete={handleDelete} />}
       {toast && <div className="toast"><Check size={17} /> {toast}</div>}
     </div>
   )
