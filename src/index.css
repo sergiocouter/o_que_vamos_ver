@@ -211,6 +211,11 @@ textarea { resize: vertical; line-height: 1.5; }
 .added-by-line { display: flex; align-items: center; gap: 4px; margin: -1px 0 6px; color: #71657c; font-size: 9px; font-weight: 700; }
 .title-card p { display: flex; align-items: center; gap: 4px; margin: 0; color: #969098; font-size: 9px; }
 .title-card p.waiting-too-long { color: #c25c39; }
+.title-card p.moved-line { margin-top: 3px; font-weight: 700; }
+.title-card p.moved-line.watchlist { color: #c25c39; }
+.title-card p.moved-line.watching { color: var(--purple); }
+.title-card p.moved-line.watched { color: var(--green); }
+.title-card .card-progress + p { margin-top: 4px; }
 .card-progress { display: flex; align-items: center; gap: 7px; }
 .card-progress > span { height: 4px; flex: 1; overflow: hidden; background: #e8e4eb; border-radius: 5px; }
 .card-progress > span > span { display: block; height: 100%; background: var(--purple); border-radius: inherit; }
@@ -290,6 +295,9 @@ legend { margin-bottom: 9px; color: #46414b; font-size: 12px; font-weight: 700; 
 .status-choice { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .status-choice button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 39px; color: #77717b; background: #faf9f7; border: 1px solid #e4e0dc; border-radius: 9px; font-size: 10px; font-weight: 700; }
 .status-choice button.active { color: var(--purple); background: var(--purple-soft); border-color: #b5a0da; }
+.season-tabs { display: flex; gap: 6px; margin: 2px 0 10px; padding-bottom: 2px; overflow-x: auto; scrollbar-width: thin; }
+.season-tabs button { flex: 0 0 auto; min-width: 38px; padding: 6px 10px; color: #77717b; background: #faf9f7; border: 1px solid #e4e0dc; border-radius: 8px; font-size: 10px; font-weight: 700; }
+.season-tabs button.active { color: var(--purple); background: var(--purple-soft); border-color: #b5a0da; }
 .trailer-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #17131b; border-radius: 12px; box-shadow: 0 8px 24px rgba(28,22,34,.14); }
 .trailer-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .trailer-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; color: var(--muted); font-size: 9px; }

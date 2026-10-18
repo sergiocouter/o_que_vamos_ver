@@ -89,10 +89,12 @@ export async function getTitleTrailer(
   tmdbId: number,
   mediaType: MediaType,
   signal?: AbortSignal,
+  season?: number,
 ): Promise<TmdbTrailer | null> {
   const remoteType = mediaType === 'movie' ? 'movie' : 'tv'
+  const seasonQuery = season && remoteType === 'tv' ? `&season=${season}` : ''
   const response = await fetch(
-    `/.netlify/functions/tmdb?action=videos&type=${remoteType}&id=${tmdbId}`,
+    `/.netlify/functions/tmdb?action=videos&type=${remoteType}&id=${tmdbId}${seasonQuery}`,
     { signal },
   )
   if (!response.ok) throw new Error('Não foi possível carregar o trailer agora.')

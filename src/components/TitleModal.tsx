@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { CalendarDays, Check, ExternalLink, Flame, LoaderCircle, Play, Save, Star, Trash2, UserRoundPlus, X } from 'lucide-react'
+import { ArrowRightLeft, CalendarDays, Check, ExternalLink, Flame, LoaderCircle, Play, Save, Star, Trash2, UserRoundPlus, X } from 'lucide-react'
 import { MEDIA_LABELS, STATUS_LABELS, type LibraryItem, type WatchStatus } from '../types'
 import { withNewStatus } from '../services/library'
+import { relativeTime, wasMoved } from '../lib/dates'
+import { NumberField } from './NumberField'
 import { Poster } from './Poster'
 import { getTitleTrailer, normalizeTmdbImageUrl, type TmdbTrailer } from '../services/tmdb'
 
@@ -12,6 +14,8 @@ interface TitleModalProps {
   onDelete: (item: LibraryItem) => Promise<void>
 }
 
+type TrailerEntry = { trailer: TmdbTrailer | null; error: boolean }
+
 const dateLabel = (value?: string) =>
   value ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(value)) : '—'
 
@@ -19,9 +23,25 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
   const [draft, setDraft] = useState(item)
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [trailer, setTrailer] = useState<TmdbTrailer | null>(null)
-  const [trailerLoading, setTrailerLoading] = useState(Boolean(item.tmdbId))
-  const [trailerError, setTrailerError] = useState(false)
+
+  const trailerSeasons =
+    item.mediaType === 'movie'
+      ? []
+      : item.seasonProgress?.length
+        ? item.seasonProgress.map(({ seasonNumber, name }) => ({ seasonNumber, name }))
+        : Array.from({ length: item.totalSeasons ?? 0 }, (_, index) => ({ seasonNumber: index + 1, name: `Temporada ${index + 1}` }))
+  const hasSeasonTrailers = trailerSeasons.length > 1
+  const [trailerSeason, setTrailerSeason] = useState(() => {
+    if (!hasSeasonTrailers) return undefined
+    const current = trailerSeasons.find((season) => season.seasonNumber === item.currentSeason)
+    return (current ?? trailerSeasons[0]).seasonNumber
+  })
+  // Trailers já buscados, por temporada ('all' para o título inteiro). Ausente = carregando.
+  const [trailers, setTrailers] = useState<Record<string, TrailerEntry>>({})
+  const trailerKey = trailerSeason ? String(trailerSeason) : 'all'
+  const trailerEntry = trailers[trailerKey]
+  const trailer = trailerEntry?.trailer ?? null
+  const trailerLoading = Boolean(item.tmdbId) && !trailerEntry
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
@@ -30,19 +50,16 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
   }, [onClose])
 
   useEffect(() => {
-    if (!item.tmdbId) return
+    if (!item.tmdbId || trailerEntry) return
     const controller = new AbortController()
-    getTitleTrailer(item.tmdbId, item.mediaType, controller.signal)
-      .then(setTrailer)
+    getTitleTrailer(item.tmdbId, item.mediaType, controller.signal, trailerSeason)
+      .then((found) => setTrailers((current) => ({ ...current, [trailerKey]: { trailer: found, error: false } })))
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === 'AbortError') return
-        setTrailerError(true)
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setTrailerLoading(false)
+        setTrailers((current) => ({ ...current, [trailerKey]: { trailer: null, error: true } }))
       })
     return () => controller.abort()
-  }, [item.mediaType, item.tmdbId])
+  }, [item.mediaType, item.tmdbId, trailerEntry, trailerKey, trailerSeason])
 
   async function save() {
     setSaving(true)
@@ -112,6 +129,22 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
                   <h3>Trailer</h3>
                   {trailer?.official && <span>OFICIAL</span>}
                 </div>
+                {hasSeasonTrailers && (
+                  <div className="season-tabs" role="tablist" aria-label="Trailer por temporada">
+                    {trailerSeasons.map((season) => (
+                      <button
+                        key={season.seasonNumber}
+                        role="tab"
+                        aria-selected={trailerSeason === season.seasonNumber}
+                        className={trailerSeason === season.seasonNumber ? 'active' : ''}
+                        title={season.name}
+                        onClick={() => setTrailerSeason(season.seasonNumber)}
+                      >
+                        T{season.seasonNumber}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {trailerLoading ? (
                   <div className="trailer-state"><LoaderCircle className="spin" size={20} /> Procurando o trailer...</div>
                 ) : trailer ? (
@@ -139,7 +172,11 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
                   </>
                 ) : (
                   <div className="trailer-state">
-                    {trailerError ? 'Não foi possível carregar o trailer agora.' : 'O TMDB ainda não tem um trailer para este título.'}
+                    {trailerEntry?.error
+                      ? 'Não foi possível carregar o trailer agora.'
+                      : trailerSeason
+                        ? `O TMDB ainda não tem um trailer da ${trailerSeasons.find((season) => season.seasonNumber === trailerSeason)?.name ?? `Temporada ${trailerSeason}`}.`
+                        : 'O TMDB ainda não tem um trailer para este título.'}
                   </div>
                 )}
               </section>
@@ -152,8 +189,8 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
                 </div>
                 <div className="progress-track"><span style={{ width: `${progress}%` }} /></div>
                 <div className="progress-inputs">
-                  <label>Temporada atual<input type="number" min="0" max={draft.totalSeasons ?? 99} value={draft.currentSeason ?? 0} onChange={(event) => setDraft({ ...draft, currentSeason: Number(event.target.value) })} /></label>
-                  <label>Episódios vistos<input type="number" min="0" max={draft.totalEpisodes ?? 9999} value={draft.watchedEpisodes ?? 0} onChange={(event) => setDraft({ ...draft, watchedEpisodes: Number(event.target.value) })} /></label>
+                  <label>Temporada atual<NumberField max={draft.totalSeasons ?? 99} value={draft.currentSeason ?? 0} onChange={(currentSeason) => setDraft((current) => ({ ...current, currentSeason }))} /></label>
+                  <label>Episódios vistos<NumberField max={draft.totalEpisodes ?? 9999} value={draft.watchedEpisodes ?? 0} onChange={(watchedEpisodes) => setDraft((current) => ({ ...current, watchedEpisodes }))} /></label>
                   <span className="total-seasons">de {draft.totalSeasons ?? '?'} temp. · {draft.totalEpisodes ?? '?'} eps.</span>
                 </div>
                 {(draft.seasonProgress?.length ?? 0) > 0 && (
@@ -168,13 +205,11 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
                           <Check size={13} />
                         </button>
                         <span><strong>{season.name}</strong><small>{season.watchedEpisodes} de {season.episodeCount} episódios</small></span>
-                        <input
+                        <NumberField
                           aria-label={`Episódios vistos em ${season.name}`}
-                          type="number"
-                          min="0"
                           max={season.episodeCount}
                           value={season.watchedEpisodes}
-                          onChange={(event) => updateSeason(season.seasonNumber, Number(event.target.value))}
+                          onChange={(watched) => updateSeason(season.seasonNumber, watched)}
                         />
                       </div>
                     ))}
@@ -206,7 +241,8 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
             <p>{draft.overview || 'Sem sinopse disponível.'}</p>
             <div className="date-timeline">
               {draft.addedByName && <span><UserRoundPlus size={17} /><span><small>Adicionado por</small>{draft.addedByName}</span></span>}
-              <span><CalendarDays size={17} /><span><small>Entrou na lista</small>{dateLabel(draft.addedAt)}</span></span>
+              <span><CalendarDays size={17} /><span><small>Entrou na lista</small>{dateLabel(draft.addedAt)} · {relativeTime(draft.addedAt)}</span></span>
+              {wasMoved(draft) && <span><ArrowRightLeft size={17} /><span><small>Movido para {STATUS_LABELS[draft.status]}</small>{dateLabel(draft.statusChangedAt)} · {relativeTime(draft.statusChangedAt)}</span></span>}
               {draft.startedAt && <span><Play size={17} /><span><small>Começamos</small>{dateLabel(draft.startedAt)}</span></span>}
               {draft.watchedAt && <span><Check size={17} /><span><small>Terminamos</small>{dateLabel(draft.watchedAt)}</span></span>}
             </div>

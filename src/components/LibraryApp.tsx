@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { addItem, listItems, removeItem, updateItem } from '../services/library'
 import { getDailyRecommendation } from '../lib/dailyRecommendation'
+import { dayDiff, relativeTime, wasMoved } from '../lib/dates'
 import {
   MEDIA_LABELS,
   STATUS_LABELS,
@@ -53,14 +54,9 @@ interface LibraryAppProps {
 
 type View = 'all' | WatchStatus
 
-const dayDiff = (value: string) =>
-  Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86_400_000))
-
-const waitingLabel = (value: string) => {
-  const days = dayDiff(value)
-  if (days === 0) return 'Adicionado hoje'
-  if (days === 1) return 'Há 1 dia na lista'
-  return `Há ${days} dias na lista`
+const addedLabel = (value: string) => {
+  const when = relativeTime(value)
+  return when === 'hoje' || when === 'ontem' ? `Entrou ${when}` : `Na lista ${when}`
 }
 
 export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }: LibraryAppProps) {
@@ -259,7 +255,9 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
                         <span className="media-line">{MEDIA_LABELS[item.mediaType]} {item.releaseYear ? `· ${item.releaseYear}` : ''}</span>
                         <h3>{item.title}</h3>
                         {item.addedByName && <span className="added-by-line"><UserRoundPlus size={12} /> {item.addedByName.split(' ')[0]}</span>}
-                        {item.status === 'watching' && item.mediaType !== 'movie' ? <div className="card-progress"><span><span style={{ width: `${progress}%` }} /></span><small>{item.watchedEpisodes ?? 0}/{item.totalEpisodes ?? '?'} eps.</small></div> : <p className={dayDiff(item.addedAt) > 60 && item.status === 'watchlist' ? 'waiting-too-long' : ''}><Clock3 size={13} /> {waitingLabel(item.statusChangedAt)}</p>}
+                        {item.status === 'watching' && item.mediaType !== 'movie' && <div className="card-progress"><span><span style={{ width: `${progress}%` }} /></span><small>{item.watchedEpisodes ?? 0}/{item.totalEpisodes ?? '?'} eps.</small></div>}
+                        <p className={dayDiff(item.addedAt) > 60 && item.status === 'watchlist' ? 'waiting-too-long' : ''}><Clock3 size={13} /> {addedLabel(item.addedAt)}</p>
+                        {wasMoved(item) && <p className={`moved-line ${item.status}`}>{item.status === 'watchlist' ? <Flame size={12} /> : item.status === 'watching' ? <Play size={12} /> : <Check size={12} />} {STATUS_LABELS[item.status]} {relativeTime(item.statusChangedAt)}</p>}
                       </div>
                     </article>
                   )

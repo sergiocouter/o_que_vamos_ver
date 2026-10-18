@@ -24,7 +24,26 @@ function json(body: unknown, status = 200, cache = 'no-store') {
   })
 }
 
-function pickTrailer(videos: TmdbVideo[]) {
+const ANY_SEASON_PATTERN = /\b(?:season|temporada|series|parte|part)\s*\d+|\b\d+\s*[ªºa]?\s*temporada\b|\bs\d{1,2}\b/i
+
+function mentionsSeason(name: string, season: number) {
+  return new RegExp(
+    `\\b(?:season|temporada|series|parte|part)\\s*0?${season}\\b|\\b${season}\\s*[ªºa]?\\s*temporada\\b|\\bs0?${season}\\b`,
+    'i',
+  ).test(name)
+}
+
+// Vídeos gerais da série: usa os que citam a temporada pedida.
+// A 1ª temporada também aceita os trailers que não citam temporada nenhuma.
+function filterBySeason(videos: TmdbVideo[], season: number) {
+  return videos.filter((video) => {
+    const name = video.name ?? ''
+    return mentionsSeason(name, season) || (season === 1 && !ANY_SEASON_PATTERN.test(name))
+  })
+}
+
+// `preferred` ganha um bônus que supera idioma e selo oficial, mas não transforma teaser em trailer.
+function pickTrailer(videos: TmdbVideo[], preferred: ReadonlySet<TmdbVideo> = new Set()) {
   const candidates = videos
     .filter(
       (video) =>
@@ -37,7 +56,8 @@ function pickTrailer(videos: TmdbVideo[]) {
       score:
         (video.type === 'Trailer' ? 100 : video.type === 'Teaser' ? 50 : 10) +
         (video.official ? 20 : 0) +
-        (video.iso_639_1 === 'pt' ? 10 : video.iso_639_1 === 'en' ? 5 : 0),
+        (video.iso_639_1 === 'pt' ? 10 : video.iso_639_1 === 'en' ? 5 : 0) +
+        (preferred.has(video) ? 30 : 0),
     }))
     .sort(
       (left, right) =>
@@ -90,14 +110,20 @@ export default async function handler(request: Request) {
   if (action === 'videos') {
     const type = url.searchParams.get('type')
     const id = url.searchParams.get('id')
+    const seasonParam = url.searchParams.get('season')
     if (!['movie', 'tv'].includes(type ?? '') || !/^\d+$/.test(id ?? '')) {
       return json({ error: 'Título inválido.' }, 400)
     }
+    if (seasonParam !== null && (type !== 'tv' || !/^\d{1,3}$/.test(seasonParam) || Number(seasonParam) < 1)) {
+      return json({ error: 'Temporada inválida.' }, 400)
+    }
+    const season = seasonParam === null ? null : Number(seasonParam)
 
-    try {
+    // Busca os vídeos em pt-BR e en-US; null quando as duas requisições não conseguem conectar.
+    async function fetchVideos(path: string): Promise<TmdbVideo[] | null> {
       const responses = await Promise.allSettled(
         ['pt-BR', 'en-US'].map(async (language) => {
-          const endpoint = new URL(`${TMDB_BASE_URL}/${type}/${id}/videos`)
+          const endpoint = new URL(`${TMDB_BASE_URL}${path}`)
           endpoint.searchParams.set('language', language)
           const response = await fetch(endpoint, {
             headers: {
@@ -110,22 +136,37 @@ export default async function handler(request: Request) {
           return payload.results ?? []
         }),
       )
+      if (!responses.some((response) => response.status === 'fulfilled')) return null
 
       const uniqueVideos = new Map<string, TmdbVideo>()
-      const availableVideos = responses.flatMap((response) =>
-        response.status === 'fulfilled' ? response.value : [],
-      )
-      if (!responses.some((response) => response.status === 'fulfilled')) {
-        return json({ error: 'Não foi possível carregar o trailer.' }, 502)
+      for (const response of responses) {
+        if (response.status !== 'fulfilled') continue
+        for (const video of response.value) if (video.key) uniqueVideos.set(video.key, video)
       }
-      for (const video of availableVideos) {
-        if (video.key) uniqueVideos.set(video.key, video)
+      return [...uniqueVideos.values()]
+    }
+
+    try {
+      let trailer: ReturnType<typeof pickTrailer> = null
+
+      if (season === null) {
+        const videos = await fetchVideos(`/${type}/${id}/videos`)
+        if (!videos) return json({ error: 'Não foi possível carregar o trailer.' }, 502)
+        trailer = pickTrailer(videos)
+      } else {
+        // Junta os vídeos da própria temporada (preferidos) com os vídeos da série que citam essa temporada.
+        const [seasonVideos, seriesVideos] = await Promise.all([
+          fetchVideos(`/tv/${id}/season/${season}/videos`),
+          fetchVideos(`/tv/${id}/videos`),
+        ])
+        if (!seasonVideos && !seriesVideos) return json({ error: 'Não foi possível carregar o trailer.' }, 502)
+        trailer = pickTrailer(
+          [...(seasonVideos ?? []), ...filterBySeason(seriesVideos ?? [], season)],
+          new Set(seasonVideos),
+        )
       }
-      return json(
-        { trailer: pickTrailer([...uniqueVideos.values()]) },
-        200,
-        'public, max-age=300, s-maxage=86400',
-      )
+
+      return json({ trailer }, 200, 'public, max-age=300, s-maxage=86400')
     } catch {
       return json({ error: 'Não foi possível carregar o trailer.' }, 502)
     }
