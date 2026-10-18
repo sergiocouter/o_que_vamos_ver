@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Bell, BellOff } from 'lucide-react'
-import { disableReminders, enableReminders, getPushSupport, isSubscribed, remindersAvailable } from '../lib/push'
+import { disableReminders, enableReminders, getPushSupport, isSubscribed, remindersAvailable, resyncReminders } from '../lib/push'
 
 export function ReminderToggle() {
   const [support, setSupport] = useState(getPushSupport)
@@ -11,7 +11,11 @@ export function ReminderToggle() {
   useEffect(() => {
     let active = true
     isSubscribed()
-      .then((subscribed) => active && setEnabled(subscribed))
+      .then((subscribed) => {
+        if (!active) return
+        setEnabled(subscribed)
+        if (subscribed) void resyncReminders().catch(() => undefined)
+      })
       .catch(() => undefined)
     return () => { active = false }
   }, [])

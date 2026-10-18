@@ -74,6 +74,24 @@ export async function enableReminders() {
   })
 }
 
+/**
+ * Reenvia a inscrição já existente no aparelho para a conta logada: corrige o dono quando outra
+ * conta usou o mesmo aparelho e recria a linha se o servidor a tiver apagado.
+ */
+export async function resyncReminders() {
+  if (!supabase || getPushSupport() !== 'granted') return
+  const registration = await navigator.serviceWorker.getRegistration()
+  const subscription = await registration?.pushManager.getSubscription()
+  if (!subscription) return
+  const { endpoint, keys } = subscription.toJSON()
+  await supabase.rpc('save_push_subscription', {
+    p_endpoint: endpoint,
+    p_p256dh: keys?.p256dh,
+    p_auth: keys?.auth,
+    p_user_agent: navigator.userAgent,
+  })
+}
+
 export async function disableReminders() {
   const registration = await navigator.serviceWorker.getRegistration()
   const subscription = await registration?.pushManager.getSubscription()

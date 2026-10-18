@@ -16,6 +16,8 @@ self.addEventListener('push', (event) => {
       badge: '/badge-96x96.png',
       image: payload.image,
       tag: payload.tag || 'lembrete-diario',
+      // Mesma tag substitui o lembrete de ontem ainda na bandeja; renotify faz vibrar/tocar de novo.
+      renotify: true,
       data: { url: typeof payload.url === 'string' && payload.url.startsWith('/') ? payload.url : '/' },
     }),
   )

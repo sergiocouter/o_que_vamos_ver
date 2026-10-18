@@ -108,7 +108,7 @@ textarea { resize: vertical; line-height: 1.5; }
 
 /* Main shell */
 .app-shell { min-height: 100vh; background: var(--canvas); }
-.sidebar { position: fixed; inset: 0 auto 0 0; z-index: 30; display: flex; flex-direction: column; width: 244px; padding: 27px 17px 18px; color: #d8d3dc; background: var(--sidebar); }
+.sidebar { position: fixed; inset: 0 auto 0 0; z-index: 30; display: flex; flex-direction: column; width: 244px; padding: 27px 17px 18px; overflow-y: auto; overscroll-behavior: contain; color: #d8d3dc; background: var(--sidebar); }
 .sidebar-brand { display: flex; align-items: center; gap: 12px; padding: 0 8px 29px; color: white; font: 600 16px/1.08 'Manrope'; }
 .sidebar-brand strong { font-size: 20px; }
 .sidebar-brand .brand-mark { width: 38px; height: 38px; }
