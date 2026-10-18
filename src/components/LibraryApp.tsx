@@ -39,6 +39,7 @@ import { AddTitleModal } from './AddTitleModal'
 import { Poster } from './Poster'
 import { ReminderToggle } from './ReminderToggle'
 import { TitleModal } from './TitleModal'
+import { CardProviders } from './WatchProviders'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -273,7 +274,10 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
                         {item.rating && <span className="card-rating"><Star size={12} fill="currentColor" /> {item.rating}</span>}
                       </div>
                       <div className="title-card-copy">
-                        <span className="media-line">{MEDIA_LABELS[item.mediaType]} {item.releaseYear ? `· ${item.releaseYear}` : ''}</span>
+                        <div className="card-meta">
+                          <span className="media-line">{MEDIA_LABELS[item.mediaType]} {item.releaseYear ? `· ${item.releaseYear}` : ''}</span>
+                          {item.tmdbId && <CardProviders tmdbId={item.tmdbId} mediaType={item.mediaType} />}
+                        </div>
                         <h3>{item.title}</h3>
                         {item.addedByName && <span className="added-by-line"><UserRoundPlus size={12} /> {item.addedByName.split(' ')[0]}</span>}
                         {item.status === 'watching' && item.mediaType !== 'movie' && <div className="card-progress"><span><span style={{ width: `${progress}%` }} /></span><small>{item.watchedEpisodes ?? 0}/{item.totalEpisodes ?? '?'} eps.</small></div>}

@@ -85,6 +85,27 @@ export async function getTitleDetails(
   return (await response.json()) as TmdbDetails
 }
 
+export type WatchProvider = { id: number; name: string; logo: string | null }
+export type WatchProviders = { link: string | null; flatrate: WatchProvider[]; rent: WatchProvider[]; buy: WatchProvider[] }
+
+// Cartão e tela do título pedem o mesmo dado: uma consulta por título enquanto o app está aberto.
+const providersCache = new Map<string, Promise<WatchProviders>>()
+
+export function getWatchProviders(tmdbId: number, mediaType: MediaType): Promise<WatchProviders> {
+  const remoteType = mediaType === 'movie' ? 'movie' : 'tv'
+  const key = `${remoteType}:${tmdbId}`
+  let request = providersCache.get(key)
+  if (!request) {
+    request = fetch(`/.netlify/functions/tmdb?action=providers&type=${remoteType}&id=${tmdbId}`).then((response) => {
+      if (!response.ok) throw new Error('Não foi possível consultar onde assistir agora.')
+      return response.json() as Promise<WatchProviders>
+    })
+    request.catch(() => providersCache.delete(key))
+    providersCache.set(key, request)
+  }
+  return request
+}
+
 export async function getTitleTrailer(
   tmdbId: number,
   mediaType: MediaType,

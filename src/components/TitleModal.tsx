@@ -5,6 +5,7 @@ import { withNewStatus } from '../services/library'
 import { relativeTime, wasMoved } from '../lib/dates'
 import { NumberField } from './NumberField'
 import { Poster } from './Poster'
+import { WatchProvidersSection } from './WatchProviders'
 import { getTitleTrailer, normalizeTmdbImageUrl, type TmdbTrailer } from '../services/tmdb'
 
 interface TitleModalProps {
@@ -181,6 +182,8 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
                 )}
               </section>
             )}
+
+            {draft.tmdbId && <WatchProvidersSection tmdbId={draft.tmdbId} mediaType={draft.mediaType} />}
 
             {draft.mediaType !== 'movie' && (
               <section>

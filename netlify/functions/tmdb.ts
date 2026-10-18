@@ -1,8 +1,9 @@
 import type { Config } from '@netlify/functions'
+import { normalizeProviders, type RawCountryProviders } from '../lib/providers.ts'
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3'
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p'
-const IMAGE_SIZES = new Set(['w185', 'w342', 'w500', 'w780', 'w1280', 'original'])
+const IMAGE_SIZES = new Set(['w92', 'w185', 'w342', 'w500', 'w780', 'w1280', 'original'])
 
 type TmdbVideo = {
   key?: string
@@ -106,6 +107,25 @@ export default async function handler(request: Request) {
 
   const token = process.env.TMDB_API_TOKEN
   if (!token) return json({ error: 'A chave do catálogo ainda não foi configurada no Netlify.' }, 503)
+
+  if (action === 'providers') {
+    const type = url.searchParams.get('type')
+    const id = url.searchParams.get('id')
+    if (!['movie', 'tv'].includes(type ?? '') || !/^\d+$/.test(id ?? '')) {
+      return json({ error: 'Título inválido.' }, 400)
+    }
+
+    try {
+      const response = await fetch(`${TMDB_BASE_URL}/${type}/${id}/watch/providers`, {
+        headers: { accept: 'application/json', authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) return json({ error: 'Não foi possível consultar onde assistir.' }, 502)
+      const payload = (await response.json()) as { results?: Record<string, RawCountryProviders> }
+      return json(normalizeProviders(payload.results?.BR), 200, 'public, max-age=3600, s-maxage=86400')
+    } catch {
+      return json({ error: 'Não foi possível consultar onde assistir.' }, 502)
+    }
+  }
 
   if (action === 'videos') {
     const type = url.searchParams.get('type')

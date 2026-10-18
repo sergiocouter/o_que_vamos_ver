@@ -41,6 +41,16 @@ export default defineConfig({
             },
           },
           {
+            // Onde assistir: guarda por 1 dia para os cartões não consultarem a cada abertura.
+            urlPattern: /\/\.netlify\/functions\/tmdb\?action=providers/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'tmdb-providers',
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
             handler: 'StaleWhileRevalidate',
             options: { cacheName: 'google-fonts' },
