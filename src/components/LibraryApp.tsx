@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   ChevronDown,
@@ -27,6 +27,7 @@ import {
 import { addItem, listItems, removeItem, updateItem } from '../services/library'
 import { getDailyRecommendation } from '../lib/dailyRecommendation'
 import { dayDiff, relativeTime, wasMoved } from '../lib/dates'
+import { isOnOverlayEntry, isOnRootEntry, pushOverlay, restoreGuard, setupBackNavigation } from '../lib/backNavigation'
 import {
   MEDIA_LABELS,
   STATUS_LABELS,
@@ -56,10 +57,6 @@ interface LibraryAppProps {
 
 type View = 'all' | WatchStatus
 
-const clearTitleParam = () => {
-  if (new URLSearchParams(window.location.search).has('titulo')) window.history.replaceState(null, '', window.location.pathname)
-}
-
 const addedLabel = (value: string) => {
   const when = relativeTime(value)
   return when === 'hoje' || when === 'ontem' ? `Entrou ${when}` : `Na lista ${when}`
@@ -77,6 +74,36 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   const [toast, setToast] = useState<string | null>(null)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [recommendationNow, setRecommendationNow] = useState(() => new Date())
+  // Lido antes de setupBackNavigation limpar a URL: notificação/recarregamento com /?titulo=<id>.
+  const [initialTitleId] = useState(() => new URLSearchParams(window.location.search).get('titulo'))
+  const openOverlays = useRef({ selectedItem, showAdd, menuOpen })
+  const lastRootBack = useRef(0)
+
+  useEffect(() => {
+    openOverlays.current = { selectedItem, showAdd, menuOpen }
+  }, [selectedItem, showAdd, menuOpen])
+
+  useEffect(() => {
+    setupBackNavigation(initialTitleId)
+    const onPopState = () => {
+      const open = openOverlays.current
+      if (open.selectedItem) setSelectedItem(null)
+      else if (open.showAdd) setShowAdd(false)
+      else if (open.menuOpen) setMenuOpen(false)
+      else if (isOnRootEntry()) {
+        // Tela inicial: o 1º voltar avisa; o 2º em até 2s sai do app.
+        if (Date.now() - lastRootBack.current < 2000) {
+          window.history.back()
+          return
+        }
+        lastRootBack.current = Date.now()
+        restoreGuard()
+        showToast('Toque em voltar de novo para sair')
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [initialTitleId])
 
   useEffect(() => {
     let active = true
@@ -84,18 +111,17 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
       .then((data) => {
         if (!active) return
         setItems(data)
-        // Notificação do lembrete diário abre /?titulo=<id>. O parâmetro fica na URL enquanto o título
-        // está aberto, para sobreviver ao recarregamento da atualização automática do PWA.
-        const titleId = new URLSearchParams(window.location.search).get('titulo')
-        if (!titleId) return
-        const target = data.find((item) => item.id === titleId)
+        if (!initialTitleId) return
+        // O passo do título foi criado em setupBackNavigation; se a pessoa já voltou, não abre.
+        if (!isOnOverlayEntry()) return
+        const target = data.find((item) => item.id === initialTitleId)
         if (target) setSelectedItem(target)
-        else clearTitleParam()
+        else window.history.back()
       })
       .catch(() => showToast('Não foi possível carregar a lista.'))
       .finally(() => active && setLoading(false))
     return () => { active = false }
-  }, [household.id])
+  }, [household.id, initialTitleId])
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -121,9 +147,30 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
     return () => window.clearTimeout(timer)
   }, [])
 
-  function closeDetail() {
+  function openTitle(item: LibraryItem) {
+    setSelectedItem(item)
+    pushOverlay('title', `?titulo=${item.id}`)
+  }
+
+  function openAdd() {
+    setShowAdd(true)
+    pushOverlay('add')
+  }
+
+  function openMenu() {
+    setMenuOpen(true)
+    pushOverlay('menu')
+  }
+
+  /** X, fundo, Esc e ações que fecham: tiram o passo do histórico (o popstate fecha a janela). */
+  function closeOverlay() {
+    if (isOnOverlayEntry()) {
+      window.history.back()
+      return
+    }
     setSelectedItem(null)
-    clearTitleParam()
+    setShowAdd(false)
+    setMenuOpen(false)
   }
 
   function showToast(message: string) {
@@ -170,7 +217,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   async function handleDelete(item: LibraryItem) {
     await removeItem(item.id, household.id)
     setItems((current) => current.filter((entry) => entry.id !== item.id))
-    closeDetail()
+    closeOverlay()
     showToast(`${item.title} foi removido.`)
   }
 
@@ -204,11 +251,11 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
     <div className="app-shell">
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="sidebar-brand"><span className="brand-mark"><Film size={21} /></span><span>O que vamos<br /><strong>ver?</strong></span></div>
-        <button className="sidebar-close icon-button" onClick={() => setMenuOpen(false)} aria-label="Fechar menu"><X size={20} /></button>
+        <button className="sidebar-close icon-button" onClick={closeOverlay} aria-label="Fechar menu"><X size={20} /></button>
         <nav className="main-nav">
           <span className="nav-caption">MINHA LISTA</span>
           {navItems.map(({ id, label, icon: Icon }) => (
-            <button key={id} className={view === id ? 'active' : ''} onClick={() => { setView(id); setMenuOpen(false) }}>
+            <button key={id} className={view === id ? 'active' : ''} onClick={() => { setView(id); closeOverlay() }}>
               <Icon size={18} /><span>{label}</span><small>{counts[id]}</small>
             </button>
           ))}
@@ -228,13 +275,13 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
         </div>
       </aside>
 
-      {menuOpen && <button className="sidebar-overlay" onClick={() => setMenuOpen(false)} aria-label="Fechar menu" />}
+      {menuOpen && <button className="sidebar-overlay" onClick={closeOverlay} aria-label="Fechar menu" />}
 
       <main className="main-content">
         <header className="topbar">
-          <button className="menu-button icon-button" onClick={() => setMenuOpen(true)} aria-label="Abrir menu"><Menu size={21} /></button>
+          <button className="menu-button icon-button" onClick={openMenu} aria-label="Abrir menu"><Menu size={21} /></button>
           <label className="global-search"><Search size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar na sua lista..." /></label>
-          <button className="primary-button add-button" onClick={() => setShowAdd(true)}><Plus size={19} /><span>Adicionar título</span></button>
+          <button className="primary-button add-button" onClick={openAdd}><Plus size={19} /><span>Adicionar título</span></button>
         </header>
 
         <div className="content-inner">
@@ -245,7 +292,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
 
           <section className="dashboard-cards">
             <article className="insight-card main-insight">
-              <div><span className="insight-icon"><Sparkles size={19} /></span><span className="eyebrow light">INDICAÇÃO DO DIA</span><h2>{dailyRecommendation ? dailyRecommendation.item.title : loading ? 'Escolhendo a indicação de hoje...' : 'Sua lista está pronta para novas histórias.'}</h2><p>{dailyRecommendation?.reason ?? (loading ? 'Um instante enquanto olhamos a lista da casa.' : 'Adicione um título que alguém indicou.')}</p><button onClick={() => dailyRecommendation ? setSelectedItem(dailyRecommendation.item) : setShowAdd(true)}>{dailyRecommendation ? 'Ver indicação' : 'Adicionar agora'} <Play size={15} /></button></div>
+              <div><span className="insight-icon"><Sparkles size={19} /></span><span className="eyebrow light">INDICAÇÃO DO DIA</span><h2>{dailyRecommendation ? dailyRecommendation.item.title : loading ? 'Escolhendo a indicação de hoje...' : 'Sua lista está pronta para novas histórias.'}</h2><p>{dailyRecommendation?.reason ?? (loading ? 'Um instante enquanto olhamos a lista da casa.' : 'Adicione um título que alguém indicou.')}</p><button onClick={() => dailyRecommendation ? openTitle(dailyRecommendation.item) : openAdd()}>{dailyRecommendation ? 'Ver indicação' : 'Adicionar agora'} <Play size={15} /></button></div>
               {dailyRecommendation?.item.posterUrl ? <div className="daily-pick-poster"><Poster src={dailyRecommendation.item.posterUrl} title={dailyRecommendation.item.title} /></div> : <div className="insight-art"><span className="art-disc" /><Clapperboard size={54} /></div>}
             </article>
             <article className="stat-card"><span className="stat-icon warm"><Flame size={20} /></span><span><strong>{counts.watchlist}</strong><small>na fila</small></span><p>{counts.watchlist ? 'Escolham o próximo!' : 'Fila zerada'}</p></article>
@@ -267,7 +314,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
                 {filteredItems.map((item) => {
                   const progress = item.totalEpisodes ? Math.min(100, Math.round(((item.watchedEpisodes ?? 0) / item.totalEpisodes) * 100)) : 0
                   return (
-                    <article className="title-card" key={item.id} onClick={() => setSelectedItem(item)}>
+                    <article className="title-card" key={item.id} onClick={() => openTitle(item)}>
                       <div className="poster-wrap">
                         <Poster src={item.posterUrl} title={item.title} />
                         <span className={`status-badge ${item.status}`}>{item.status === 'watchlist' ? <Flame size={12} /> : item.status === 'watching' ? <Play size={12} /> : <Check size={12} />}{STATUS_LABELS[item.status]}</span>
@@ -287,10 +334,10 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
                     </article>
                   )
                 })}
-                <button className="add-card" onClick={() => setShowAdd(true)}><span><Plus size={24} /></span><strong>Adicionar outro</strong><small>Filme, série ou reality</small></button>
+                <button className="add-card" onClick={openAdd}><span><Plus size={24} /></span><strong>Adicionar outro</strong><small>Filme, série ou reality</small></button>
               </div>
             ) : (
-              <div className="empty-library"><span><Tv size={30} /></span><h3>Nada por aqui ainda</h3><p>{query ? 'Tente buscar outro nome ou limpar os filtros.' : 'Salve uma indicação para ela não escapar.'}</p><button className="primary-button" onClick={() => setShowAdd(true)}><Plus size={18} /> Adicionar título</button></div>
+              <div className="empty-library"><span><Tv size={30} /></span><h3>Nada por aqui ainda</h3><p>{query ? 'Tente buscar outro nome ou limpar os filtros.' : 'Salve uma indicação para ela não escapar.'}</p><button className="primary-button" onClick={openAdd}><Plus size={18} /> Adicionar título</button></div>
             )}
           </section>
           <footer className="app-footer"><span><Film size={15} /> Feito para o sofá de casa.</span><span>Dados de catálogo fornecidos por TMDB.</span></footer>
@@ -299,12 +346,12 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
 
       <nav className="mobile-nav">
         {navItems.slice(0, 2).map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><Icon size={20} /><span>{label}</span></button>)}
-        <button className="mobile-add" onClick={() => setShowAdd(true)}><Plus size={25} /></button>
+        <button className="mobile-add" onClick={openAdd}><Plus size={25} /></button>
         {navItems.slice(2).map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><Icon size={20} /><span>{label}</span></button>)}
       </nav>
 
-      {showAdd && <AddTitleModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />}
-      {selectedItem && <TitleModal item={selectedItem} onClose={closeDetail} onSave={handleSave} onDelete={handleDelete} />}
+      {showAdd && <AddTitleModal onClose={closeOverlay} onAdd={handleAdd} />}
+      {selectedItem && <TitleModal item={selectedItem} onClose={closeOverlay} onSave={handleSave} onDelete={handleDelete} />}
       {toast && <div className="toast"><Check size={17} /> {toast}</div>}
     </div>
   )

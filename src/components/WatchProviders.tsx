@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, LoaderCircle } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import type { MediaType } from '../types'
 import { getWatchProviders, type WatchProvider, type WatchProviders } from '../services/tmdb'
 
@@ -43,16 +43,16 @@ export function CardProviders({ tmdbId, mediaType }: ProvidersProps) {
   )
 }
 
-/** Seção "Onde assistir" na tela do título. */
+/** Seção "Onde assistir" na tela do título. Só aparece quando há algum streaming. */
 export function WatchProvidersSection({ tmdbId, mediaType }: ProvidersProps) {
-  const state = useWatchProviders(tmdbId, mediaType)
-  const groups = state?.data
-    ? ([
-        ['Assinatura', state.data.flatrate],
-        ['Alugar', state.data.rent],
-        ['Comprar', state.data.buy],
-      ] as const).filter(([, list]) => list.length)
-    : []
+  const data = useWatchProviders(tmdbId, mediaType)?.data
+  if (!data) return null
+  const groups = ([
+    ['Assinatura', data.flatrate],
+    ['Alugar', data.rent],
+    ['Comprar', data.buy],
+  ] as const).filter(([, list]) => list.length)
+  if (!groups.length) return null
 
   return (
     <section className="providers-section">
@@ -60,37 +60,27 @@ export function WatchProvidersSection({ tmdbId, mediaType }: ProvidersProps) {
         <h3>Onde assistir</h3>
         <span>BRASIL</span>
       </div>
-      {!state ? (
-        <div className="trailer-state"><LoaderCircle className="spin" size={20} /> Procurando nos streamings...</div>
-      ) : state.error ? (
-        <div className="trailer-state">Não foi possível consultar onde assistir agora.</div>
-      ) : !groups.length ? (
-        <div className="trailer-state">Não encontramos este título em streamings no Brasil.</div>
-      ) : (
-        <>
-          {groups.map(([label, list]) => (
-            <div className="provider-group" key={label}>
-              <h4>{label}</h4>
-              <div className="provider-list">
-                {list.map((provider) => (
-                  <span className="provider" key={provider.id}>
-                    <ProviderLogo provider={provider} />
-                    <small>{provider.name}</small>
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-          <div className="providers-footer">
-            {state.data?.link && (
-              <a className="providers-link" href={state.data.link} target="_blank" rel="noopener noreferrer">
-                Ver opções <ExternalLink size={13} />
-              </a>
-            )}
-            <small>Dados: JustWatch</small>
+      {groups.map(([label, list]) => (
+        <div className="provider-group" key={label}>
+          <h4>{label}</h4>
+          <div className="provider-list">
+            {list.map((provider) => (
+              <span className="provider" key={provider.id}>
+                <ProviderLogo provider={provider} />
+                <small>{provider.name}</small>
+              </span>
+            ))}
           </div>
-        </>
-      )}
+        </div>
+      ))}
+      <div className="providers-footer">
+        {data.link && (
+          <a className="providers-link" href={data.link} target="_blank" rel="noopener noreferrer">
+            Ver opções <ExternalLink size={13} />
+          </a>
+        )}
+        <small>Dados: JustWatch</small>
+      </div>
     </section>
   )
 }
