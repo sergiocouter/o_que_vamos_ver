@@ -88,6 +88,8 @@ textarea { resize: vertical; line-height: 1.5; }
 .auth-panel { display: grid; place-items: center; padding: 50px; }
 .auth-form-wrap { width: min(420px, 100%); }
 .mobile-brand { display: none; }
+.invite-banner { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 18px; padding: 12px 14px; color: var(--purple-dark); background: var(--purple-soft); border: 1px solid #d9cdf0; border-radius: 12px; font-size: 13px; line-height: 1.45; }
+.invite-banner svg { flex: 0 0 auto; margin-top: 1px; }
 .auth-form-wrap h2 { margin: 10px 0 8px; font-size: 31px; letter-spacing: -.03em; }
 .auth-form-wrap > div > p { line-height: 1.5; }
 .auth-form { display: grid; gap: 17px; margin-top: 30px; }

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { ArrowRight, Eye, EyeOff, Film, LoaderCircle } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Film, LoaderCircle, MailOpen } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { getPendingInvite } from '../lib/invite'
 
 interface AuthScreenProps {
   onDemo: () => void
@@ -14,6 +15,7 @@ export function AuthScreen({ onDemo }: AuthScreenProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [hasInvite] = useState(() => getPendingInvite() !== null)
 
   async function handleGoogleLogin() {
     if (!supabase) return
@@ -81,6 +83,12 @@ export function AuthScreen({ onDemo }: AuthScreenProps) {
       <section className="auth-panel">
         <div className="auth-form-wrap">
           <span className="mobile-brand"><Film size={20} /> O que vamos ver?</span>
+          {hasInvite && (
+            <p className="invite-banner">
+              <MailOpen size={18} />
+              <span>Você recebeu um convite para uma casa. Entre ou crie sua conta para participar.</span>
+            </p>
+          )}
           <div>
             <span className="eyebrow">BEM-VINDO AO SOFÁ</span>
             <h2>{mode === 'signin' ? 'Entre na sua casa' : 'Crie seu acesso'}</h2>

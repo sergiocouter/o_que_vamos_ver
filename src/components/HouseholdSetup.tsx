@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { ArrowRight, Home, KeyRound, LoaderCircle } from 'lucide-react'
 import { createHousehold, joinHousehold } from '../services/library'
 import { errorMessage } from '../lib/errors'
+import { clearPendingInvite, getPendingInvite } from '../lib/invite'
 import type { Household } from '../types'
 
 interface HouseholdSetupProps {
@@ -9,8 +10,10 @@ interface HouseholdSetupProps {
 }
 
 export function HouseholdSetup({ onReady }: HouseholdSetupProps) {
-  const [mode, setMode] = useState<'create' | 'join' | null>(null)
-  const [value, setValue] = useState('')
+  // Veio por link de convite: já abre em "Entrar com código", com o código preenchido.
+  const [invitedCode] = useState(getPendingInvite)
+  const [mode, setMode] = useState<'create' | 'join' | null>(invitedCode ? 'join' : null)
+  const [value, setValue] = useState(invitedCode ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,6 +27,7 @@ export function HouseholdSetup({ onReady }: HouseholdSetupProps) {
         mode === 'create'
           ? await createHousehold(value.trim() || 'Nossa casa')
           : await joinHousehold(value)
+      clearPendingInvite()
       onReady(household)
     } catch (reason) {
       setError(errorMessage(reason, 'Não foi possível continuar.'))
@@ -58,7 +62,7 @@ export function HouseholdSetup({ onReady }: HouseholdSetupProps) {
             className={mode === 'join' ? 'active' : ''}
             onClick={() => {
               setMode('join')
-              setValue('')
+              setValue(invitedCode ?? '')
               setError(null)
             }}
           >
@@ -68,6 +72,11 @@ export function HouseholdSetup({ onReady }: HouseholdSetupProps) {
         {!mode && (
           <p className="setup-choice-hint">
             Se alguém da família já criou a casa, escolha <strong>Entrar com código</strong>.
+          </p>
+        )}
+        {mode === 'join' && invitedCode && value === invitedCode && (
+          <p className="setup-choice-hint">
+            O código do convite que você recebeu já está preenchido. É só tocar em <strong>Entrar na casa</strong>.
           </p>
         )}
         {mode && (

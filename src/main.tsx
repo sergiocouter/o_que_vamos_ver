@@ -2,6 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { capturePendingInvite } from './lib/invite'
+
+// Antes de tudo: o login com Google e o botão voltar reescrevem a URL.
+capturePendingInvite()
 
 if ('serviceWorker' in navigator) {
   let isReloadingForUpdate = false

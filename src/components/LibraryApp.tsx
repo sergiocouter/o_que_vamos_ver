@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { addItem, listItems, removeItem, updateItem } from '../services/library'
 import { getDailyRecommendation } from '../lib/dailyRecommendation'
+import { clearPendingInvite, getPendingInvite, inviteLink } from '../lib/invite'
 import { dayDiff, relativeTime, wasMoved } from '../lib/dates'
 import { isOnOverlayEntry, isOnRootEntry, pushOverlay, replaceOverlay, restoreGuard, setupBackNavigation } from '../lib/backNavigation'
 import {
@@ -74,7 +75,12 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   const [addPreset, setAddPreset] = useState<SearchResult | null>(null)
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(() => {
+    const pending = getPendingInvite()
+    return pending && pending !== household.inviteCode
+      ? `Esse convite é de outra casa. Você já participa da ${household.name}.`
+      : null
+  })
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [recommendationNow, setRecommendationNow] = useState(() => new Date())
   // Lido antes de setupBackNavigation limpar a URL: notificação/recarregamento com /?titulo=<id>.
@@ -85,6 +91,22 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   useEffect(() => {
     openOverlays.current = { selectedItem, showAdd, menuOpen }
   }, [selectedItem, showAdd, menuOpen])
+
+  // Link de convite aberto por quem já tem casa: descarta e, se for de outra casa, avisa.
+  const showsInviteNotice = useRef(toast !== null)
+  useEffect(() => {
+    if (!showsInviteNotice.current) {
+      clearPendingInvite()
+      return
+    }
+    // Descarta só quando o aviso some: se o app recarregar antes (instalação ou atualização do
+    // service worker), o aviso aparece de novo.
+    const timer = window.setTimeout(() => {
+      clearPendingInvite()
+      setToast(null)
+    }, 5000)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     setupBackNavigation(initialTitleId)
@@ -255,11 +277,17 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   }
 
   async function shareInvite() {
-    const text = `Entre na nossa lista “${household.name}” com o código ${household.inviteCode}.`
-    if (navigator.share) await navigator.share({ title: 'O que vamos ver?', text })
-    else {
-      await navigator.clipboard.writeText(household.inviteCode)
-      showToast('Código de convite copiado!')
+    const link = inviteLink(household.inviteCode)
+    const text = `Entre na nossa lista “${household.name}” no O que vamos ver: ${link}`
+    if (navigator.share) {
+      await navigator.share({ title: 'O que vamos ver?', text }).catch(() => undefined)
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(link)
+      showToast('Link de convite copiado!')
+    } catch {
+      showToast(`Código de convite: ${household.inviteCode}`)
     }
   }
 
