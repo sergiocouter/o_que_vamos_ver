@@ -103,13 +103,13 @@ language plpgsql security definer set search_path = '' as $$
 declare new_household public.households;
 begin
   if auth.uid() is null then raise exception 'Você precisa estar autenticado.'; end if;
-  if exists (select 1 from public.household_members where user_id = auth.uid()) then
+  if exists (select 1 from public.household_members where household_members.user_id = auth.uid()) then
     raise exception 'Você já participa de uma casa.';
   end if;
   if exists (
     select 1
     from public.households
-    where invite_code = upper(regexp_replace(household_name, '[[:space:]]', '', 'g'))
+    where households.invite_code = upper(regexp_replace(household_name, '[[:space:]]', '', 'g'))
   ) then
     raise exception 'Esse é um código de convite. Escolha "Entrar com código" para participar dessa casa.';
   end if;

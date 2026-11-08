@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ArrowLeft, Check, LoaderCircle, Plus, Search, Sparkles, X } from 'lucide-react'
 import { getTitleDetails, searchTitles } from '../services/tmdb'
+import { errorMessage } from '../lib/errors'
 import type { LibraryItem, MediaType, SearchResult, WatchStatus } from '../types'
 import { MEDIA_LABELS, STATUS_LABELS } from '../types'
 import { Poster } from './Poster'
@@ -41,7 +42,7 @@ export function AddTitleModal({ onClose, onAdd }: AddTitleModalProps) {
     try {
       setResults(await searchTitles(query.trim()))
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível buscar.')
+      setError(errorMessage(reason, 'Não foi possível buscar.'))
     } finally {
       setLoading(false)
     }
@@ -90,7 +91,7 @@ export function AddTitleModal({ onClose, onAdd }: AddTitleModalProps) {
       })
       onClose()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível adicionar.')
+      setError(errorMessage(reason, 'Não foi possível adicionar.'))
     } finally {
       setSaving(false)
     }

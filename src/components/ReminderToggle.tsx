@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Bell, BellOff } from 'lucide-react'
 import { disableReminders, enableReminders, getPushSupport, isSubscribed, remindersAvailable, resyncReminders } from '../lib/push'
+import { errorMessage } from '../lib/errors'
 
 export function ReminderToggle() {
   const [support, setSupport] = useState(getPushSupport)
@@ -34,7 +35,7 @@ export function ReminderToggle() {
         setEnabled(true)
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível mudar o lembrete agora.')
+      setError(errorMessage(reason, 'Não foi possível mudar o lembrete agora.'))
     } finally {
       setSupport(getPushSupport())
       setBusy(false)

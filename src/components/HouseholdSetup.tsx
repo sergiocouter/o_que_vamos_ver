@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { ArrowRight, Home, KeyRound, LoaderCircle } from 'lucide-react'
 import { createHousehold, joinHousehold } from '../services/library'
+import { errorMessage } from '../lib/errors'
 import type { Household } from '../types'
 
 interface HouseholdSetupProps {
@@ -25,7 +26,7 @@ export function HouseholdSetup({ onReady }: HouseholdSetupProps) {
           : await joinHousehold(value)
       onReady(household)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Não foi possível continuar.')
+      setError(errorMessage(reason, 'Não foi possível continuar.'))
     } finally {
       setLoading(false)
     }
