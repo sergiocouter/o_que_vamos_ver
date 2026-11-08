@@ -1,46 +1,98 @@
-// Botão voltar do celular: cada janela aberta por cima da lista (título, busca, menu) vira um passo
-// no histórico, e um passo extra ("guard") segura o primeiro voltar na tela inicial.
+// Botão voltar: cada tela vira um passo no histórico do navegador e o voltar sempre volta UM nível.
+// Cada passo guarda a tela inteira (lista + janela aberta), então o voltar só reaplica o passo
+// anterior. Um passo extra ("guard") segura o primeiro voltar na tela inicial.
+//
+// root → guard (Visão geral) → [lista filtrada] → [janela] → [janela] ...
 
-export type OverlayKind = 'title' | 'add' | 'menu'
+import type { SearchResult, WatchStatus } from '../types'
 
-type HistoryMark = { oqvv?: 'root' | 'guard' | 'overlay'; kind?: OverlayKind }
+export type View = 'all' | WatchStatus
 
-const currentMark = () => (window.history.state ?? {}) as HistoryMark
+export type Overlay =
+  | { kind: 'title'; titleId: string }
+  /** `preset`: etapa "Como vamos salvar?". `from`: de onde a prévia veio (a busca ou um parecido). */
+  | { kind: 'add'; preset?: SearchResult; from: 'search' | 'similar' }
+  | { kind: 'menu' }
 
-export const isOnOverlayEntry = () => currentMark().oqvv === 'overlay'
-export const isOnRootEntry = () => currentMark().oqvv === 'root'
-
-/**
- * Ao abrir o app: raiz + guard (+ o passo do título, quando aberto por /?titulo=<id>, já com o
- * parâmetro na URL para sobreviver a um recarregamento antes de a lista chegar).
- * Num recarregamento a estrutura já existe e fica como está.
- */
-export function setupBackNavigation(initialTitleId: string | null) {
-  const mark = currentMark().oqvv
-  if (mark === 'guard' || mark === 'overlay') return
-  const path = window.location.pathname
-  window.history.replaceState({ oqvv: 'root' }, '', path)
-  window.history.pushState({ oqvv: 'guard' }, '', path)
-  if (initialTitleId) pushOverlay('title', `?titulo=${encodeURIComponent(initialTitleId)}`)
+export interface Screen {
+  view: View
+  overlay: Overlay | null
 }
 
-export function pushOverlay(kind: OverlayKind, search = '') {
-  window.history.pushState({ oqvv: 'overlay', kind }, '', `${window.location.pathname}${search}`)
-}
+type Mark = 'root' | 'guard' | 'step'
+type Entry = Screen & { oqvv: Mark }
 
-/**
- * Troca a janela aberta por outra no mesmo passo do histórico (ex.: de um título para a prévia de
- * um parecido): o voltar continua fechando de uma vez e voltando para a lista.
- */
-export function replaceOverlay(kind: OverlayKind, search = '') {
-  if (!isOnOverlayEntry()) {
-    pushOverlay(kind, search)
-    return
+const VIEWS: readonly View[] = ['all', 'watchlist', 'watching', 'watched']
+export const HOME: Screen = { view: 'all', overlay: null }
+
+/** Lê a tela guardada num passo do histórico (aceita passos antigos e estados desconhecidos). */
+export function screenFromState(state: unknown, search = ''): Screen {
+  const entry = (state ?? {}) as Partial<Entry> & { kind?: string }
+  const view = VIEWS.includes(entry.view as View) ? (entry.view as View) : 'all'
+  if (entry.overlay && typeof entry.overlay === 'object') return { view, overlay: entry.overlay }
+  // Versão anterior do app: { oqvv: 'overlay', kind: 'title' } com ?titulo=<id> na URL.
+  const legacyTitle = new URLSearchParams(search).get('titulo')
+  if ((entry.oqvv as string) === 'overlay' && entry.kind === 'title' && legacyTitle) {
+    return { view, overlay: { kind: 'title', titleId: legacyTitle } }
   }
-  window.history.replaceState({ oqvv: 'overlay', kind }, '', `${window.location.pathname}${search}`)
+  return { view, overlay: null }
+}
+
+/**
+ * Como trocar de lista sem empilhar à toa: da Visão geral para uma lista filtrada empilha; entre
+ * filtradas substitui; de uma filtrada para a Visão geral volta (o passo da Visão geral já existe).
+ */
+export function planViewChange(current: View, target: View): 'none' | 'push' | 'replace' | 'back' {
+  if (current === target) return 'none'
+  if (target === 'all') return 'back'
+  return current === 'all' ? 'push' : 'replace'
+}
+
+/** Quantos passos fecham a janela de "Adicionar" inteira (busca + "Como vamos salvar?"). */
+export function stepsToCloseAdd(overlay: Overlay): number {
+  return overlay.kind === 'add' && overlay.preset && overlay.from === 'search' ? 2 : 1
+}
+
+const urlFor = (screen: Screen) =>
+  `${window.location.pathname}${screen.overlay?.kind === 'title' ? `?titulo=${encodeURIComponent(screen.overlay.titleId)}` : ''}`
+
+const currentEntry = () => (window.history.state ?? {}) as Partial<Entry>
+
+export const isOnRootEntry = () => currentEntry().oqvv === 'root'
+export const currentScreen = () => screenFromState(window.history.state, window.location.search)
+
+/**
+ * Ao abrir o app: raiz + guard (+ o título aberto por /?titulo=<id>, vindo da notificação).
+ * Num recarregamento a pilha já existe: devolve a tela do passo atual.
+ */
+export function setupBackNavigation(initialTitleId: string | null): Screen {
+  const mark = currentEntry().oqvv as string | undefined
+  if (mark === 'guard' || mark === 'step' || mark === 'overlay') {
+    const screen = currentScreen()
+    if (mark === 'overlay') replaceScreen(screen)
+    return screen
+  }
+  const path = window.location.pathname
+  window.history.replaceState({ oqvv: 'root', ...HOME } satisfies Entry, '', path)
+  window.history.pushState({ oqvv: 'guard', ...HOME } satisfies Entry, '', path)
+  if (!initialTitleId) return HOME
+  const screen: Screen = { view: 'all', overlay: { kind: 'title', titleId: initialTitleId } }
+  pushScreen(screen)
+  return screen
+}
+
+export function pushScreen(screen: Screen) {
+  window.history.pushState({ oqvv: 'step', ...screen } satisfies Entry, '', urlFor(screen))
+}
+
+/** Troca a tela do passo atual (mantém o tipo do passo: guard continua guard). */
+export function replaceScreen(screen: Screen) {
+  const mark = currentEntry().oqvv
+  const oqvv: Mark = mark === 'guard' || mark === 'root' ? mark : 'step'
+  window.history.replaceState({ oqvv, ...screen } satisfies Entry, '', urlFor(screen))
 }
 
 /** Recoloca o guard depois do primeiro voltar na tela inicial. */
 export function restoreGuard() {
-  window.history.pushState({ oqvv: 'guard' }, '', window.location.pathname)
+  window.history.pushState({ oqvv: 'guard', ...HOME } satisfies Entry, '', window.location.pathname)
 }

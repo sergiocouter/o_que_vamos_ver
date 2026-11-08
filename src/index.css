@@ -187,6 +187,8 @@ textarea { resize: vertical; line-height: 1.5; }
 .stat-icon.warm { color: var(--orange); background: var(--orange-soft); }
 .stat-icon.purple { color: var(--purple); background: var(--purple-soft); }
 .stat-icon.green { color: var(--green); background: var(--green-soft); }
+.stat-card[role="button"] { cursor: pointer; transition: border-color .2s, box-shadow .2s, transform .2s; }
+.stat-card[role="button"]:hover, .stat-card[role="button"]:focus-visible { border-color: #cdbfe6; box-shadow: 0 10px 26px rgba(33,26,45,.08); transform: translateY(-1px); outline: none; }
 .stat-card > span:nth-child(2) { display: grid; }
 .stat-card strong { font: 800 25px/1 'Manrope'; }
 .stat-card small { color: var(--muted); font-size: 9px; }

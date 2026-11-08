@@ -29,7 +29,18 @@ import { getDailyRecommendation } from '../lib/dailyRecommendation'
 import { clearPendingInvite, getPendingInvite, inviteLink } from '../lib/invite'
 import { formatRating } from '../lib/ratings'
 import { dayDiff, relativeTime, wasMoved } from '../lib/dates'
-import { isOnOverlayEntry, isOnRootEntry, pushOverlay, replaceOverlay, restoreGuard, setupBackNavigation } from '../lib/backNavigation'
+import {
+  isOnRootEntry,
+  planViewChange,
+  pushScreen,
+  replaceScreen,
+  restoreGuard,
+  screenFromState,
+  setupBackNavigation,
+  stepsToCloseAdd,
+  type Screen,
+  type View,
+} from '../lib/backNavigation'
 import {
   MEDIA_LABELS,
   STATUS_LABELS,
@@ -59,8 +70,6 @@ interface LibraryAppProps {
   onSignOut: () => void
 }
 
-type View = 'all' | WatchStatus
-
 const addedLabel = (value: string) => {
   const when = relativeTime(value)
   return when === 'hoje' || when === 'ontem' ? `Entrou ${when}` : `Na lista ${when}`
@@ -68,15 +77,9 @@ const addedLabel = (value: string) => {
 
 export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }: LibraryAppProps) {
   const [items, setItems] = useState<LibraryItem[]>([])
-  const [view, setView] = useState<View>('all')
   const [mediaFilter, setMediaFilter] = useState<'all' | MediaType>('all')
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
-  const [showAdd, setShowAdd] = useState(false)
-  // Título já escolhido ao abrir "Adicionar" a partir de "Parecidos com este".
-  const [addPreset, setAddPreset] = useState<SearchResult | null>(null)
-  const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null)
-  const [menuOpen, setMenuOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(() => {
     const pending = getPendingInvite()
     return pending && pending !== household.inviteCode
@@ -85,14 +88,17 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   })
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [recommendationNow, setRecommendationNow] = useState(() => new Date())
-  // Lido antes de setupBackNavigation limpar a URL: notificação/recarregamento com /?titulo=<id>.
-  const [initialTitleId] = useState(() => new URLSearchParams(window.location.search).get('titulo'))
-  const openOverlays = useRef({ selectedItem, showAdd, menuOpen })
+  // Tela atual = passo atual do histórico (lista + janela aberta). Notificação: /?titulo=<id>.
+  const [screen, setScreen] = useState<Screen>(() =>
+    setupBackNavigation(new URLSearchParams(window.location.search).get('titulo')),
+  )
+  const { view, overlay } = screen
+  const selectedItem = overlay?.kind === 'title' ? items.find((item) => item.id === overlay.titleId) ?? null : null
+  const menuOpen = overlay?.kind === 'menu'
   const lastRootBack = useRef(0)
-
-  useEffect(() => {
-    openOverlays.current = { selectedItem, showAdd, menuOpen }
-  }, [selectedItem, showAdd, menuOpen])
+  // Ação para depois de um voltar (ex.: fechar o menu e então trocar de lista).
+  const afterPop = useRef<((screen: Screen) => void) | null>(null)
+  const librarySection = useRef<HTMLElement>(null)
 
   // Link de convite aberto por quem já tem casa: descarta e, se for de outra casa, avisa.
   const showsInviteNotice = useRef(toast !== null)
@@ -111,13 +117,9 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   }, [])
 
   useEffect(() => {
-    setupBackNavigation(initialTitleId)
-    const onPopState = () => {
-      const open = openOverlays.current
-      if (open.selectedItem) setSelectedItem(null)
-      else if (open.showAdd) setShowAdd(false)
-      else if (open.menuOpen) setMenuOpen(false)
-      else if (isOnRootEntry()) {
+    // Voltar = reaplicar a tela do passo anterior.
+    const onPopState = (event: PopStateEvent) => {
+      if (isOnRootEntry()) {
         // Tela inicial: o 1º voltar avisa; o 2º em até 2s sai do app.
         if (Date.now() - lastRootBack.current < 2000) {
           window.history.back()
@@ -125,12 +127,25 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
         }
         lastRootBack.current = Date.now()
         restoreGuard()
+        setScreen({ view: 'all', overlay: null })
         showToast('Toque em voltar de novo para sair')
+        return
       }
+      const next = screenFromState(event.state, window.location.search)
+      setScreen(next)
+      const after = afterPop.current
+      afterPop.current = null
+      after?.(next)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [initialTitleId])
+  }, [])
+
+  // Título que não existe mais (removido, ou link antigo de notificação): volta um nível.
+  const missingTitle = !loading && overlay?.kind === 'title' && !selectedItem
+  useEffect(() => {
+    if (missingTitle) window.history.back()
+  }, [missingTitle])
 
   useEffect(() => {
     let active = true
@@ -138,17 +153,11 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
       .then((data) => {
         if (!active) return
         setItems(data)
-        if (!initialTitleId) return
-        // O passo do título foi criado em setupBackNavigation; se a pessoa já voltou, não abre.
-        if (!isOnOverlayEntry()) return
-        const target = data.find((item) => item.id === initialTitleId)
-        if (target) setSelectedItem(target)
-        else window.history.back()
       })
       .catch(() => showToast('Não foi possível carregar a lista.'))
       .finally(() => active && setLoading(false))
     return () => { active = false }
-  }, [household.id, initialTitleId])
+  }, [household.id])
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -174,29 +183,40 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
     return () => window.clearTimeout(timer)
   }, [])
 
+  /** Abre uma tela nova por cima (um nível a mais no voltar). */
+  function go(next: Screen) {
+    pushScreen(next)
+    setScreen(next)
+  }
+
+  /** Troca a tela atual sem criar nível. */
+  function swap(next: Screen) {
+    replaceScreen(next)
+    setScreen(next)
+  }
+
   function openTitle(item: LibraryItem) {
-    setSelectedItem(item)
-    pushOverlay('title', `?titulo=${item.id}`)
+    go({ view, overlay: { kind: 'title', titleId: item.id } })
   }
 
   function openAdd() {
-    setAddPreset(null)
-    setShowAdd(true)
-    pushOverlay('add')
+    go({ view, overlay: { kind: 'add', from: 'search' } })
   }
 
-  /** Sugestão que já está na lista: troca a janela pelo título da casa. */
-  function openSimilarItem(item: LibraryItem) {
-    setSelectedItem(item)
-    replaceOverlay('title', `?titulo=${item.id}`)
+  /** Resultado da busca escolhido: "Como vamos salvar?" vira um nível (o voltar volta à busca). */
+  function selectForAdd(result: SearchResult) {
+    go({ view, overlay: { kind: 'add', from: 'search', preset: result } })
   }
 
-  /** Sugestão nova: troca a janela do título pela prévia de "Adicionar". */
+  function backToSearch() {
+    if (overlay?.kind !== 'add') return
+    if (overlay.from === 'search') window.history.back()
+    else swap({ view, overlay: { kind: 'add', from: 'search' } })
+  }
+
+  /** Sugestão nova de "Parecidos com este": prévia de "Adicionar" por cima do título. */
   function previewSimilar(result: SearchResult) {
-    setSelectedItem(null)
-    setAddPreset(result)
-    setShowAdd(true)
-    replaceOverlay('add')
+    go({ view, overlay: { kind: 'add', from: 'similar', preset: result } })
   }
 
   function findInList(result: SearchResult) {
@@ -205,19 +225,37 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   }
 
   function openMenu() {
-    setMenuOpen(true)
-    pushOverlay('menu')
+    go({ view, overlay: { kind: 'menu' } })
   }
 
-  /** X, fundo, Esc e ações que fecham: tiram o passo do histórico (o popstate fecha a janela). */
+  /** X, fundo, Esc e ações que fecham: volta um nível ("Adicionar" fecha a janela inteira). */
   function closeOverlay() {
-    if (isOnOverlayEntry()) {
-      window.history.back()
+    if (!overlay) return
+    window.history.go(-stepsToCloseAdd(overlay))
+  }
+
+  /** Troca de lista: da Visão geral empilha, entre filtradas substitui, para a Visão geral volta. */
+  function changeView(target: View, from: View = view) {
+    const plan = planViewChange(from, target)
+    if (plan === 'push') go({ view: target, overlay: null })
+    else if (plan === 'replace') swap({ view: target, overlay: null })
+    else if (plan === 'back') window.history.back()
+  }
+
+  /** Menu do celular: fecha (voltar) e só então troca de lista. No computador ele fica sempre à vista. */
+  function selectFromMenu(target: View) {
+    if (!menuOpen) {
+      changeView(target)
       return
     }
-    setSelectedItem(null)
-    setShowAdd(false)
-    setMenuOpen(false)
+    afterPop.current = (screenAfter) => changeView(target, screenAfter.view)
+    window.history.back()
+  }
+
+  /** Cartões de resumo: abrem a lista filtrada e rolam até ela. */
+  function showList(target: WatchStatus) {
+    changeView(target)
+    window.requestAnimationFrame(() => librarySection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
   function showToast(message: string) {
@@ -268,8 +306,8 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
 
   async function handleDelete(item: LibraryItem) {
     await removeItem(item.id, household.id)
+    // Sem fechar aqui: o título some da lista e a tela volta um nível sozinha (missingTitle).
     setItems((current) => current.filter((entry) => entry.id !== item.id))
-    closeOverlay()
     showToast(`${item.title} foi removido.`)
   }
 
@@ -313,7 +351,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
         <nav className="main-nav">
           <span className="nav-caption">MINHA LISTA</span>
           {navItems.map(({ id, label, icon: Icon }) => (
-            <button key={id} className={view === id ? 'active' : ''} onClick={() => { setView(id); closeOverlay() }}>
+            <button key={id} className={view === id ? 'active' : ''} onClick={() => selectFromMenu(id)}>
               <Icon size={18} /><span>{label}</span><small>{counts[id]}</small>
             </button>
           ))}
@@ -353,16 +391,16 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
               <div><span className="insight-icon"><Sparkles size={19} /></span><span className="eyebrow light">INDICAÇÃO DO DIA</span><h2>{dailyRecommendation ? dailyRecommendation.item.title : loading ? 'Escolhendo a indicação de hoje...' : 'Sua lista está pronta para novas histórias.'}</h2><p>{dailyRecommendation?.reason ?? (loading ? 'Um instante enquanto olhamos a lista da casa.' : 'Adicione um título que alguém indicou.')}</p><button onClick={() => dailyRecommendation ? openTitle(dailyRecommendation.item) : openAdd()}>{dailyRecommendation ? 'Ver indicação' : 'Adicionar agora'} <Play size={15} /></button></div>
               {dailyRecommendation?.item.posterUrl ? <div className="daily-pick-poster"><Poster src={dailyRecommendation.item.posterUrl} title={dailyRecommendation.item.title} /></div> : <div className="insight-art"><span className="art-disc" /><Clapperboard size={54} /></div>}
             </article>
-            <article className="stat-card"><span className="stat-icon warm"><Flame size={20} /></span><span><strong>{counts.watchlist}</strong><small>na fila</small></span><p>{counts.watchlist ? 'Escolham o próximo!' : 'Fila zerada'}</p></article>
-            <article className="stat-card"><span className="stat-icon purple"><Play size={20} /></span><span><strong>{counts.watching}</strong><small>em andamento</small></span><p>{counts.watching ? 'Tem história rolando' : 'Nada em andamento'}</p></article>
-            <article className="stat-card"><span className="stat-icon green"><Check size={20} /></span><span><strong>{counts.watched}</strong><small>já vistos</small></span><p>{counts.watched ? 'Memórias do sofá' : 'Comecem a assistir'}</p></article>
+            <article className="stat-card" role="button" tabIndex={0} onClick={() => showList('watchlist')} onKeyDown={(event) => event.key === 'Enter' && showList('watchlist')} aria-label={`Ver ${counts.watchlist} títulos na fila`}><span className="stat-icon warm"><Flame size={20} /></span><span><strong>{counts.watchlist}</strong><small>na fila</small></span><p>{counts.watchlist ? 'Escolham o próximo!' : 'Fila zerada'}</p></article>
+            <article className="stat-card" role="button" tabIndex={0} onClick={() => showList('watching')} onKeyDown={(event) => event.key === 'Enter' && showList('watching')} aria-label={`Ver ${counts.watching} títulos em andamento`}><span className="stat-icon purple"><Play size={20} /></span><span><strong>{counts.watching}</strong><small>em andamento</small></span><p>{counts.watching ? 'Tem história rolando' : 'Nada em andamento'}</p></article>
+            <article className="stat-card" role="button" tabIndex={0} onClick={() => showList('watched')} onKeyDown={(event) => event.key === 'Enter' && showList('watched')} aria-label={`Ver ${counts.watched} títulos já vistos`}><span className="stat-icon green"><Check size={20} /></span><span><strong>{counts.watched}</strong><small>já vistos</small></span><p>{counts.watched ? 'Memórias do sofá' : 'Comecem a assistir'}</p></article>
           </section>
 
-          <section className="library-section">
+          <section className="library-section" ref={librarySection}>
             <div className="library-heading"><div><h2>{view === 'all' ? 'Nossa lista' : STATUS_LABELS[view]}</h2><p>{filteredItems.length} {filteredItems.length === 1 ? 'título encontrado' : 'títulos encontrados'}</p></div><div className="view-actions"><ListFilter size={17} /><select value={mediaFilter} onChange={(event) => setMediaFilter(event.target.value as 'all' | MediaType)}><option value="all">Todos os tipos</option><option value="movie">Filmes</option><option value="tv">Séries</option><option value="reality">Realitys</option></select><ChevronDown size={15} /></div></div>
 
             <div className="quick-tabs">
-              {navItems.map(({ id, label }) => <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>{label}<span>{counts[id]}</span></button>)}
+              {navItems.map(({ id, label }) => <button key={id} className={view === id ? 'active' : ''} onClick={() => changeView(id)}>{label}<span>{counts[id]}</span></button>)}
             </div>
 
             {loading ? (
@@ -411,12 +449,20 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
       </main>
 
       <nav className="mobile-nav">
-        {navItems.slice(0, 2).map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><Icon size={20} /><span>{label}</span></button>)}
+        {navItems.slice(0, 2).map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? 'active' : ''} onClick={() => changeView(id)}><Icon size={20} /><span>{label}</span></button>)}
         <button className="mobile-add" onClick={openAdd}><Plus size={25} /></button>
-        {navItems.slice(2).map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><Icon size={20} /><span>{label}</span></button>)}
+        {navItems.slice(2).map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? 'active' : ''} onClick={() => changeView(id)}><Icon size={20} /><span>{label}</span></button>)}
       </nav>
 
-      {showAdd && <AddTitleModal key={addPreset ? `${addPreset.mediaType}-${addPreset.tmdbId}` : 'search'} onClose={closeOverlay} onAdd={handleAdd} initialSelection={addPreset ?? undefined} />}
+      {overlay?.kind === 'add' && (
+        <AddTitleModal
+          selection={overlay.preset ?? null}
+          onSelect={selectForAdd}
+          onBackToSearch={backToSearch}
+          onClose={closeOverlay}
+          onAdd={handleAdd}
+        />
+      )}
       {selectedItem && (
         <TitleModal
           key={selectedItem.id}
@@ -425,7 +471,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
           onSave={handleSave}
           onDelete={handleDelete}
           findInList={findInList}
-          onOpenItem={openSimilarItem}
+          onOpenItem={openTitle}
           onPreview={previewSimilar}
           me={me}
         />

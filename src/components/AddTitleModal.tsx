@@ -8,10 +8,13 @@ import { Poster } from './Poster'
 import { PreviewTrailer } from './TrailerFrame'
 
 interface AddTitleModalProps {
+  /** Título escolhido = etapa "Como vamos salvar?" (controlado pela navegação: o voltar volta à busca). */
+  selection: SearchResult | null
+  onSelect: (result: SearchResult) => void
+  onBackToSearch: () => void
+  /** X, fundo, Esc e depois de adicionar: fecha a janela inteira. */
   onClose: () => void
   onAdd: (item: LibraryItem) => Promise<void>
-  /** Abre direto na etapa "Como vamos salvar?" (ex.: vindo de "Parecidos com este"). */
-  initialSelection?: SearchResult
 }
 
 const REALITY_GENRE_ID = 10764
@@ -21,12 +24,16 @@ const inferredMediaType = (result: SearchResult): MediaType => {
   return result.genreIds.includes(REALITY_GENRE_ID) ? 'reality' : 'tv'
 }
 
-export function AddTitleModal({ onClose, onAdd, initialSelection }: AddTitleModalProps) {
+export function AddTitleModal({ selection: selected, onSelect, onBackToSearch, onClose, onAdd }: AddTitleModalProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
-  const [selected, setSelected] = useState<SearchResult | null>(initialSelection ?? null)
-  const [mediaType, setMediaType] = useState<MediaType>(() => (initialSelection ? inferredMediaType(initialSelection) : 'movie'))
-  const [status, setStatus] = useState<WatchStatus>('watchlist')
+  // Tipo e lista escolhidos valem só para o título escolhido; trocar de título volta ao padrão.
+  const selectedKey = selected ? `${selected.mediaType}-${selected.tmdbId}` : ''
+  const [choice, setChoice] = useState<{ key: string; mediaType: MediaType; status: WatchStatus } | null>(null)
+  const mediaType = choice?.key === selectedKey ? choice.mediaType : selected ? inferredMediaType(selected) : 'movie'
+  const status = choice?.key === selectedKey ? choice.status : 'watchlist'
+  const setMediaType = (value: MediaType) => setChoice({ key: selectedKey, mediaType: value, status })
+  const setStatus = (value: WatchStatus) => setChoice({ key: selectedKey, mediaType, status: value })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,8 +59,8 @@ export function AddTitleModal({ onClose, onAdd, initialSelection }: AddTitleModa
   }
 
   function choose(result: SearchResult) {
-    setSelected(result)
-    setMediaType(inferredMediaType(result))
+    setError(null)
+    onSelect(result)
   }
 
   async function confirm() {
@@ -113,7 +120,7 @@ export function AddTitleModal({ onClose, onAdd, initialSelection }: AddTitleModa
 
         {selected ? (
           <div className="selected-title-step">
-            <button className="back-link" onClick={() => setSelected(null)}><ArrowLeft size={16} /> Voltar à busca</button>
+            <button className="back-link" onClick={() => { setError(null); onBackToSearch() }}><ArrowLeft size={16} /> Voltar à busca</button>
             <div className="selected-title-summary">
               <Poster src={selected.posterUrl} title={selected.title} />
               <div>
