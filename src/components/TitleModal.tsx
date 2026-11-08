@@ -3,6 +3,8 @@ import { ArrowRightLeft, CalendarDays, Check, Flame, LoaderCircle, Play, Save, S
 import { MEDIA_LABELS, STATUS_LABELS, type LibraryItem, type SearchResult, type WatchStatus } from '../types'
 import { withNewStatus } from '../services/library'
 import { relativeTime, wasMoved } from '../lib/dates'
+import { averageRating, formatRating, withMyRating } from '../lib/ratings'
+import { Stars } from './Stars'
 import { NumberField } from './NumberField'
 import { Poster } from './Poster'
 import { WatchProvidersSection } from './WatchProviders'
@@ -18,6 +20,8 @@ interface TitleModalProps {
   findInList: (result: SearchResult) => LibraryItem | undefined
   onOpenItem: (item: LibraryItem) => void
   onPreview: (result: SearchResult) => void
+  /** Quem está usando o app: só a nota dessa pessoa é editável. */
+  me: { id: string; name: string }
 }
 
 type TrailerEntry = { trailer: TmdbTrailer | null; error: boolean }
@@ -25,7 +29,7 @@ type TrailerEntry = { trailer: TmdbTrailer | null; error: boolean }
 const dateLabel = (value?: string) =>
   value ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(value)) : '—'
 
-export function TitleModal({ item, onClose, onSave, onDelete, findInList, onOpenItem, onPreview }: TitleModalProps) {
+export function TitleModal({ item, onClose, onSave, onDelete, findInList, onOpenItem, onPreview, me }: TitleModalProps) {
   const [draft, setDraft] = useState(item)
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -72,6 +76,18 @@ export function TitleModal({ item, onClose, onSave, onDelete, findInList, onOpen
     await onSave(draft)
     setSaving(false)
     onClose()
+  }
+
+  const ratings = draft.ratings ?? []
+  const myRating = ratings.find((entry) => entry.userId === me.id)?.rating
+  const otherRatings = ratings.filter((entry) => entry.userId !== me.id)
+
+  /** Tocar na estrela que já está marcada apaga a minha nota. */
+  function rate(value: number) {
+    setDraft((current) => {
+      const next = withMyRating(current.ratings ?? [], me.id, me.name, myRating === value ? null : value)
+      return { ...current, ratings: next, rating: averageRating(next) }
+    })
   }
 
   function setStatus(status: WatchStatus) {
@@ -206,16 +222,36 @@ export function TitleModal({ item, onClose, onSave, onDelete, findInList, onOpen
             )}
 
             <section>
-              <h3>Termômetro da casa</h3>
-              <p className="muted small">O quanto vocês gostaram?</p>
-              <div className="rating-control">
-                {[1, 2, 3, 4, 5].map((rating) => (
-                  <button key={rating} className={(draft.rating ?? 0) >= rating ? 'active' : ''} onClick={() => setDraft({ ...draft, rating })} aria-label={`${rating} de 5`}>
-                    <Star size={25} fill={(draft.rating ?? 0) >= rating ? 'currentColor' : 'none'} />
-                  </button>
-                ))}
-                <strong>{draft.rating ? `${draft.rating}/5` : 'Ainda sem nota'}</strong>
+              <div className="section-heading-line">
+                <h3>Termômetro da casa</h3>
+                {draft.rating !== undefined && (
+                  <span className="rating-average"><Star size={12} fill="currentColor" /> {formatRating(draft.rating)} · {ratings.length} {ratings.length === 1 ? 'nota' : 'notas'}</span>
+                )}
               </div>
+              <p className="muted small">O quanto cada um gostou?</p>
+              <div className="rating-person mine">
+                <span>Sua nota</span>
+                <div className="rating-control">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <button
+                      key={value}
+                      className={(myRating ?? 0) >= value ? 'active' : ''}
+                      onClick={() => rate(value)}
+                      aria-label={myRating === value ? `Apagar sua nota ${value} de 5` : `Sua nota: ${value} de 5`}
+                    >
+                      <Star size={25} fill={(myRating ?? 0) >= value ? 'currentColor' : 'none'} />
+                    </button>
+                  ))}
+                </div>
+                <strong>{myRating ? `${myRating}/5` : 'Ainda sem nota'}</strong>
+              </div>
+              {otherRatings.map((entry) => (
+                <div className="rating-person" key={entry.userId}>
+                  <span>{entry.name.split(' ')[0]}</span>
+                  <Stars value={entry.rating} size={18} />
+                  <strong>{entry.rating}/5</strong>
+                </div>
+              ))}
             </section>
 
             <section>

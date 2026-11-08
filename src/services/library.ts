@@ -1,5 +1,6 @@
 import { demoItems } from '../data/demo'
 import { supabase } from '../lib/supabase'
+import { averageRating, buildRatings, type PersonRating, type RatingRow } from '../lib/ratings'
 import type { Household, LibraryItem, MediaType, SeasonProgress, WatchStatus } from '../types'
 
 const STORAGE_KEY = 'oqvv-demo-library-v1'
@@ -22,7 +23,6 @@ type TitleRow = {
   watched_episodes: number | null
   season_progress: SeasonProgress[] | null
   status: WatchStatus
-  rating: number | null
   notes: string | null
   recommended_by: string | null
   added_by: string | null
@@ -32,7 +32,7 @@ type TitleRow = {
   watched_at: string | null
 }
 
-function fromRow(row: TitleRow, addedByName?: string): LibraryItem {
+function fromRow(row: TitleRow, addedByName?: string, ratings: PersonRating[] = []): LibraryItem {
   return {
     id: row.id,
     householdId: row.household_id,
@@ -51,7 +51,8 @@ function fromRow(row: TitleRow, addedByName?: string): LibraryItem {
     watchedEpisodes: row.watched_episodes ?? undefined,
     seasonProgress: row.season_progress ?? undefined,
     status: row.status,
-    rating: row.rating ?? undefined,
+    rating: averageRating(ratings),
+    ratings,
     notes: row.notes ?? undefined,
     recommendedBy: row.recommended_by ?? undefined,
     addedById: row.added_by ?? undefined,
@@ -81,7 +82,6 @@ function toRow(item: LibraryItem, householdId: string, userId?: string) {
     watched_episodes: item.watchedEpisodes ?? 0,
     season_progress: item.seasonProgress ?? [],
     status: item.status,
-    rating: item.rating ?? null,
     notes: item.notes ?? null,
     recommended_by: item.recommendedBy ?? null,
     ...(userId ? { added_by: userId } : {}),
@@ -92,16 +92,24 @@ function toRow(item: LibraryItem, householdId: string, userId?: string) {
   }
 }
 
+// Demonstração: a pessoa é sempre "Sérgio" (id 'demo'); notas antigas viram notas dele.
+export const DEMO_USER_ID = 'demo'
+
+function withDemoRatings(item: LibraryItem): LibraryItem {
+  const ratings = item.ratings ?? (item.rating ? [{ userId: DEMO_USER_ID, name: 'Sérgio', rating: item.rating }] : [])
+  return { ...item, ratings, rating: averageRating(ratings) }
+}
+
 function getDemoItems(): LibraryItem[] {
   const stored = localStorage.getItem(STORAGE_KEY)
   if (!stored) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(demoItems))
-    return demoItems
+    return demoItems.map(withDemoRatings)
   }
   try {
-    return JSON.parse(stored) as LibraryItem[]
+    return (JSON.parse(stored) as LibraryItem[]).map(withDemoRatings)
   } catch {
-    return demoItems
+    return demoItems.map(withDemoRatings)
   }
 }
 
@@ -168,7 +176,21 @@ export async function listItems(householdId: string): Promise<LibraryItem[]> {
     .order('status_changed_at', { ascending: false })
   if (error) throw error
   const rows = data as TitleRow[]
-  const profileIds = [...new Set(rows.flatMap((row) => (row.added_by ? [row.added_by] : [])))]
+  let ratingRows: RatingRow[] = []
+  if (rows.length) {
+    const { data: ratingData, error: ratingsError } = await supabase
+      .from('title_ratings')
+      .select('title_id, user_id, rating, rated_at')
+      .in('title_id', rows.map((row) => row.id))
+    if (ratingsError) throw ratingsError
+    ratingRows = ratingData as RatingRow[]
+  }
+  const profileIds = [
+    ...new Set([
+      ...rows.flatMap((row) => (row.added_by ? [row.added_by] : [])),
+      ...ratingRows.map((row) => row.user_id),
+    ]),
+  ]
   const namesById = new Map<string, string>()
 
   if (profileIds.length) {
@@ -182,7 +204,10 @@ export async function listItems(householdId: string): Promise<LibraryItem[]> {
     }
   }
 
-  return rows.map((row) => fromRow(row, row.added_by ? namesById.get(row.added_by) : undefined))
+  const ratingsByTitle = buildRatings(ratingRows, namesById)
+  return rows.map((row) =>
+    fromRow(row, row.added_by ? namesById.get(row.added_by) : undefined, ratingsByTitle.get(row.id)),
+  )
 }
 
 export async function addItem(
@@ -222,7 +247,21 @@ export async function updateItem(
     .select()
     .single()
   if (error) throw error
-  return fromRow(data as TitleRow, item.addedByName)
+  return fromRow(data as TitleRow, item.addedByName, item.ratings)
+}
+
+/** Grava (ou apaga, com `null`) a nota da própria pessoa. Na demonstração, a nota já vai em updateItem. */
+export async function saveMyRating(titleId: string, userId: string, rating: number | null) {
+  if (!supabase) return
+  if (rating === null) {
+    const { error } = await supabase.from('title_ratings').delete().eq('title_id', titleId).eq('user_id', userId)
+    if (error) throw error
+    return
+  }
+  const { error } = await supabase
+    .from('title_ratings')
+    .upsert({ title_id: titleId, user_id: userId, rating, rated_at: new Date().toISOString() })
+  if (error) throw error
 }
 
 export async function removeItem(itemId: string, householdId: string) {

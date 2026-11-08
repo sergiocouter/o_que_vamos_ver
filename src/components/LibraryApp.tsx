@@ -24,9 +24,10 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { addItem, listItems, removeItem, updateItem } from '../services/library'
+import { addItem, DEMO_USER_ID, listItems, removeItem, saveMyRating, updateItem } from '../services/library'
 import { getDailyRecommendation } from '../lib/dailyRecommendation'
 import { clearPendingInvite, getPendingInvite, inviteLink } from '../lib/invite'
+import { formatRating } from '../lib/ratings'
 import { dayDiff, relativeTime, wasMoved } from '../lib/dates'
 import { isOnOverlayEntry, isOnRootEntry, pushOverlay, replaceOverlay, restoreGuard, setupBackNavigation } from '../lib/backNavigation'
 import {
@@ -42,6 +43,7 @@ import { AddTitleModal } from './AddTitleModal'
 import { Poster } from './Poster'
 import { ReminderToggle } from './ReminderToggle'
 import { TitleModal } from './TitleModal'
+import { Stars } from './Stars'
 import { CardProviders } from './WatchProviders'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -253,7 +255,12 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
     showToast(`${saved.title} entrou na lista!`)
   }
 
+  const me = { id: userId ?? DEMO_USER_ID, name: displayName }
+
   async function handleSave(item: LibraryItem) {
+    const before = items.find((entry) => entry.id === item.id)?.ratings?.find((entry) => entry.userId === me.id)?.rating
+    const after = item.ratings?.find((entry) => entry.userId === me.id)?.rating
+    if (before !== after) await saveMyRating(item.id, me.id, after ?? null)
     const saved = await updateItem(item, household.id)
     setItems((current) => current.map((entry) => (entry.id === saved.id ? saved : entry)))
     showToast('Alterações salvas.')
@@ -369,7 +376,6 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
                       <div className="poster-wrap">
                         <Poster src={item.posterUrl} title={item.title} />
                         <span className={`status-badge ${item.status}`}>{item.status === 'watchlist' ? <Flame size={12} /> : item.status === 'watching' ? <Play size={12} /> : <Check size={12} />}{STATUS_LABELS[item.status]}</span>
-                        {item.rating && <span className="card-rating"><Star size={12} fill="currentColor" /> {item.rating}</span>}
                       </div>
                       <div className="title-card-copy">
                         <div className="card-meta">
@@ -378,6 +384,15 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
                         </div>
                         <h3>{item.title}</h3>
                         {item.addedByName && <span className="added-by-line"><UserRoundPlus size={12} /> {item.addedByName.split(' ')[0]}</span>}
+                        {item.rating !== undefined && item.ratings?.length ? (
+                          <div className="card-ratings">
+                            <span className="card-average"><Star size={11} fill="currentColor" /> {formatRating(item.rating)} <small>média</small></span>
+                            {item.ratings.slice(0, 3).map((entry) => (
+                              <span className="card-person" key={entry.userId}><span>{entry.name.split(' ')[0]}</span><Stars value={entry.rating} size={10} /></span>
+                            ))}
+                            {item.ratings.length > 3 && <small className="card-more">+{item.ratings.length - 3}</small>}
+                          </div>
+                        ) : null}
                         {item.status === 'watching' && item.mediaType !== 'movie' && <div className="card-progress"><span><span style={{ width: `${progress}%` }} /></span><small>{item.watchedEpisodes ?? 0}/{item.totalEpisodes ?? '?'} eps.</small></div>}
                         <p className={dayDiff(item.addedAt) > 60 && item.status === 'watchlist' ? 'waiting-too-long' : ''}><Clock3 size={13} /> {addedLabel(item.addedAt)}</p>
                         {wasMoved(item) && <p className={`moved-line ${item.status}`}>{item.status === 'watchlist' ? <Flame size={12} /> : item.status === 'watching' ? <Play size={12} /> : <Check size={12} />} {STATUS_LABELS[item.status]} {relativeTime(item.statusChangedAt)}</p>}
@@ -412,6 +427,7 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
           findInList={findInList}
           onOpenItem={openSimilarItem}
           onPreview={previewSimilar}
+          me={me}
         />
       )}
       {toast && <div className="toast"><Check size={17} /> {toast}</div>}

@@ -217,7 +217,6 @@ textarea { resize: vertical; line-height: 1.5; }
 .status-badge.watchlist { background: rgba(204,96,43,.9); }
 .status-badge.watching { background: rgba(99,68,163,.92); }
 .status-badge.watched { background: rgba(48,122,94,.92); }
-.card-rating { position: absolute; right: 7px; bottom: 7px; display: inline-flex; align-items: center; gap: 3px; padding: 4px 6px; color: #ffd26b; background: rgba(27,23,31,.82); border-radius: 6px; font-size: 9px; font-weight: 700; }
 .title-card-copy { padding: 9px 3px 0; }
 .media-line { display: block; margin-bottom: 3px; color: var(--purple); font-size: 8px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .title-card h3 { margin: 0 0 6px; font-size: 13px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .2s; }
@@ -225,6 +224,14 @@ textarea { resize: vertical; line-height: 1.5; }
 .card-meta .media-line { margin-bottom: 0; }
 .card-providers { display: inline-flex; flex: 0 0 auto; gap: 3px; }
 .card-providers img, .card-providers .provider-fallback { width: 16px; height: 16px; border-radius: 4px; }
+.stars { display: inline-flex; gap: 1px; color: #d5d0d8; }
+.stars .on { color: #edaa3f; }
+.card-ratings { display: grid; gap: 2px; margin: -2px 0 6px; }
+.card-average { display: inline-flex; align-items: center; gap: 3px; color: #b47716; font-size: 10px; font-weight: 800; }
+.card-average small { color: var(--muted); font-size: 8px; font-weight: 700; }
+.card-person { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; color: #71657c; font-size: 9px; font-weight: 700; }
+.card-person > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-more { color: var(--muted); font-size: 8px; font-weight: 700; }
 .added-by-line { display: flex; align-items: center; gap: 4px; margin: -1px 0 6px; color: #71657c; font-size: 9px; font-weight: 700; }
 .title-card p { display: flex; align-items: center; gap: 4px; margin: 0; color: #969098; font-size: 9px; }
 .title-card p.waiting-too-long { color: #c25c39; }
@@ -355,6 +362,12 @@ legend { margin-bottom: 9px; color: #46414b; font-size: 12px; font-weight: 700; 
 .season-row small { color: var(--muted); font-size: 8px; }
 .season-row input { width: 52px; padding: 6px; font-size: 10px; text-align: center; }
 .rating-control { display: flex; align-items: center; gap: 3px; }
+.section-heading-line .rating-average { display: inline-flex; align-items: center; gap: 4px; color: #b47716; font-size: 11px; font-weight: 800; }
+.rating-person { display: grid; grid-template-columns: 74px auto 1fr; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid #f0eeeb; }
+.rating-person:first-of-type, .rating-person.mine { border-top: 0; }
+.rating-person > span:first-child { overflow: hidden; color: var(--ink); font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.rating-person > strong { color: var(--muted); font-size: 10px; }
+.rating-person:not(.mine) .stars { padding-left: 2px; }
 .rating-control button { padding: 2px; color: #d5d0d8; background: transparent; border: 0; }
 .rating-control button.active { color: #edaa3f; }
 .rating-control strong { margin-left: 10px; color: var(--muted); font-size: 10px; }

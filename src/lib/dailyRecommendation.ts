@@ -1,4 +1,5 @@
 import type { LibraryItem } from '../types'
+import { formatRating } from './ratings'
 
 export interface DailyRecommendation {
   item: LibraryItem
@@ -64,7 +65,7 @@ export function getDailyRecommendation(
     reason = 'Já está em andamento — uma boa pedida para continuar hoje.'
   } else if (selected.item.status === 'watched') {
     reason = selected.item.rating
-      ? `Levou ${selected.item.rating}/5 no termômetro da casa. Vale uma reprise.`
+      ? `Levou ${formatRating(selected.item.rating)}/5 no termômetro da casa. Vale uma reprise.`
       : 'Já passou pelo sofá e entrou no rodízio para rever.'
   } else if (selected.waitingDays >= 30) {
     reason = `Está há ${selected.waitingDays} dias na lista. Hoje é um ótimo dia para desencalhar.`

@@ -1,3 +1,5 @@
+import type { PersonRating } from './lib/ratings'
+
 export type WatchStatus = 'watchlist' | 'watching' | 'watched'
 export type MediaType = 'movie' | 'tv' | 'reality'
 
@@ -27,7 +29,10 @@ export interface LibraryItem {
   watchedEpisodes?: number
   seasonProgress?: SeasonProgress[]
   status: WatchStatus
+  /** Média da casa (derivada de `ratings`, só leitura). */
   rating?: number
+  /** Nota de cada pessoa da casa. */
+  ratings?: PersonRating[]
   notes?: string
   recommendedBy?: string
   addedById?: string

@@ -1,6 +1,6 @@
 # Nota de cada pessoa
 
-Data: 2026-11-08 · Status: em revisão
+Data: 2026-11-08 · Status: aprovado e implementado
 
 ## Objetivo
 
