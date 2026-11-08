@@ -27,13 +27,14 @@ import {
 import { addItem, listItems, removeItem, updateItem } from '../services/library'
 import { getDailyRecommendation } from '../lib/dailyRecommendation'
 import { dayDiff, relativeTime, wasMoved } from '../lib/dates'
-import { isOnOverlayEntry, isOnRootEntry, pushOverlay, restoreGuard, setupBackNavigation } from '../lib/backNavigation'
+import { isOnOverlayEntry, isOnRootEntry, pushOverlay, replaceOverlay, restoreGuard, setupBackNavigation } from '../lib/backNavigation'
 import {
   MEDIA_LABELS,
   STATUS_LABELS,
   type Household,
   type LibraryItem,
   type MediaType,
+  type SearchResult,
   type WatchStatus,
 } from '../types'
 import { AddTitleModal } from './AddTitleModal'
@@ -69,6 +70,8 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  // Título já escolhido ao abrir "Adicionar" a partir de "Parecidos com este".
+  const [addPreset, setAddPreset] = useState<SearchResult | null>(null)
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -153,8 +156,28 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
   }
 
   function openAdd() {
+    setAddPreset(null)
     setShowAdd(true)
     pushOverlay('add')
+  }
+
+  /** Sugestão que já está na lista: troca a janela pelo título da casa. */
+  function openSimilarItem(item: LibraryItem) {
+    setSelectedItem(item)
+    replaceOverlay('title', `?titulo=${item.id}`)
+  }
+
+  /** Sugestão nova: troca a janela do título pela prévia de "Adicionar". */
+  function previewSimilar(result: SearchResult) {
+    setSelectedItem(null)
+    setAddPreset(result)
+    setShowAdd(true)
+    replaceOverlay('add')
+  }
+
+  function findInList(result: SearchResult) {
+    const isMovie = result.mediaType === 'movie'
+    return items.find((item) => item.tmdbId === result.tmdbId && (item.mediaType === 'movie') === isMovie)
   }
 
   function openMenu() {
@@ -350,8 +373,19 @@ export function LibraryApp({ household, userId, displayName, isDemo, onSignOut }
         {navItems.slice(2).map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><Icon size={20} /><span>{label}</span></button>)}
       </nav>
 
-      {showAdd && <AddTitleModal onClose={closeOverlay} onAdd={handleAdd} />}
-      {selectedItem && <TitleModal item={selectedItem} onClose={closeOverlay} onSave={handleSave} onDelete={handleDelete} />}
+      {showAdd && <AddTitleModal key={addPreset ? `${addPreset.mediaType}-${addPreset.tmdbId}` : 'search'} onClose={closeOverlay} onAdd={handleAdd} initialSelection={addPreset ?? undefined} />}
+      {selectedItem && (
+        <TitleModal
+          key={selectedItem.id}
+          item={selectedItem}
+          onClose={closeOverlay}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          findInList={findInList}
+          onOpenItem={openSimilarItem}
+          onPreview={previewSimilar}
+        />
+      )}
       {toast && <div className="toast"><Check size={17} /> {toast}</div>}
     </div>
   )

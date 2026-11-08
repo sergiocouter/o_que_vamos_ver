@@ -1,5 +1,6 @@
 import type { Config } from '@netlify/functions'
 import { normalizeProviders, type RawCountryProviders } from '../lib/providers.ts'
+import { pickSimilar, type RawSimilarItem } from '../lib/similar.ts'
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3'
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p'
@@ -125,6 +126,37 @@ export default async function handler(request: Request) {
     } catch {
       return json({ error: 'Não foi possível consultar onde assistir.' }, 502)
     }
+  }
+
+  if (action === 'similar') {
+    const type = url.searchParams.get('type')
+    const id = url.searchParams.get('id')
+    if ((type !== 'movie' && type !== 'tv') || !/^\d+$/.test(id ?? '')) {
+      return json({ error: 'Título inválido.' }, 400)
+    }
+
+    // Lista de uma das duas fontes; null quando a consulta não deu certo.
+    async function fetchList(kind: 'recommendations' | 'similar'): Promise<RawSimilarItem[] | null> {
+      const endpoint = new URL(`${TMDB_BASE_URL}/${type}/${id}/${kind}`)
+      endpoint.searchParams.set('language', 'pt-BR')
+      endpoint.searchParams.set('page', '1')
+      const response = await fetch(endpoint, {
+        headers: { accept: 'application/json', authorization: `Bearer ${token}` },
+      }).catch(() => null)
+      if (!response?.ok) return null
+      const payload = (await response.json().catch(() => null)) as { results?: RawSimilarItem[] } | null
+      return payload?.results ?? []
+    }
+
+    const recommendations = await fetchList('recommendations')
+    const needsFallback = !recommendations || pickSimilar(type, Number(id), recommendations, []).length === 0
+    const similar = needsFallback ? await fetchList('similar') : []
+    if (!recommendations && !similar) return json({ error: 'Não foi possível buscar títulos parecidos.' }, 502)
+    return json(
+      { results: pickSimilar(type, Number(id), recommendations ?? [], similar ?? []) },
+      200,
+      'public, max-age=3600, s-maxage=86400',
+    )
   }
 
   if (action === 'videos') {

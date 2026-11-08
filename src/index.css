@@ -327,6 +327,14 @@ legend { margin-bottom: 9px; color: #46414b; font-size: 12px; font-weight: 700; 
 .trailer-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; color: var(--muted); font-size: 9px; }
 .trailer-actions > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trailer-actions a { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; color: var(--purple); font-weight: 700; text-decoration: none; }
+.preview-trailer { margin: -6px 0 22px; }
+.similar-row { display: flex; gap: 12px; margin: 0 -4px; padding: 2px 4px 6px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.similar-card { flex: 0 0 104px; display: grid; gap: 3px; padding: 0; color: var(--ink); background: transparent; border: 0; text-align: left; cursor: pointer; scroll-snap-align: start; }
+.similar-card .poster { border-radius: 10px; box-shadow: 0 6px 16px rgba(28,22,34,.12); }
+.similar-card:hover .poster img, .similar-card:focus-visible .poster img { transform: scale(1.04); }
+.similar-card strong { margin-top: 5px; overflow: hidden; font-size: 10px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.similar-card small { color: var(--muted); font-size: 9px; }
+.similar-badge { position: absolute; left: 6px; bottom: 6px; display: inline-flex; align-items: center; gap: 3px; padding: 3px 6px; color: white; background: var(--green); border-radius: 7px; font-size: 8px; font-weight: 700; }
 .trailer-state { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 105px; padding: 18px; color: var(--muted); background: #f7f5f8; border: 1px dashed #d9d3de; border-radius: 12px; font-size: 10px; text-align: center; }
 .section-heading-line { display: flex; align-items: center; justify-content: space-between; }
 .section-heading-line span { color: var(--purple); font-size: 9px; font-weight: 700; }

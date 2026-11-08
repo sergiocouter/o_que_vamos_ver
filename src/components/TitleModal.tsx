@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { ArrowRightLeft, CalendarDays, Check, ExternalLink, Flame, LoaderCircle, Play, Save, Star, Trash2, UserRoundPlus, X } from 'lucide-react'
-import { MEDIA_LABELS, STATUS_LABELS, type LibraryItem, type WatchStatus } from '../types'
+import { ArrowRightLeft, CalendarDays, Check, Flame, LoaderCircle, Play, Save, Star, Trash2, UserRoundPlus, X } from 'lucide-react'
+import { MEDIA_LABELS, STATUS_LABELS, type LibraryItem, type SearchResult, type WatchStatus } from '../types'
 import { withNewStatus } from '../services/library'
 import { relativeTime, wasMoved } from '../lib/dates'
 import { NumberField } from './NumberField'
 import { Poster } from './Poster'
 import { WatchProvidersSection } from './WatchProviders'
+import { SimilarTitles } from './SimilarTitles'
+import { TrailerFrame } from './TrailerFrame'
 import { getTitleTrailer, normalizeTmdbImageUrl, type TmdbTrailer } from '../services/tmdb'
 
 interface TitleModalProps {
@@ -13,6 +15,9 @@ interface TitleModalProps {
   onClose: () => void
   onSave: (item: LibraryItem) => Promise<void>
   onDelete: (item: LibraryItem) => Promise<void>
+  findInList: (result: SearchResult) => LibraryItem | undefined
+  onOpenItem: (item: LibraryItem) => void
+  onPreview: (result: SearchResult) => void
 }
 
 type TrailerEntry = { trailer: TmdbTrailer | null; error: boolean }
@@ -20,7 +25,7 @@ type TrailerEntry = { trailer: TmdbTrailer | null; error: boolean }
 const dateLabel = (value?: string) =>
   value ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(value)) : '—'
 
-export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps) {
+export function TitleModal({ item, onClose, onSave, onDelete, findInList, onOpenItem, onPreview }: TitleModalProps) {
   const [draft, setDraft] = useState(item)
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -149,28 +154,7 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
                 {trailerLoading ? (
                   <div className="trailer-state"><LoaderCircle className="spin" size={20} /> Procurando o trailer...</div>
                 ) : trailer ? (
-                  <>
-                    <div className="trailer-frame">
-                      <iframe
-                        src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(trailer.key)}?rel=0`}
-                        title={`${trailer.name} — ${draft.title}`}
-                        loading="lazy"
-                        referrerPolicy="strict-origin-when-cross-origin"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowFullScreen
-                      />
-                    </div>
-                    <div className="trailer-actions">
-                      <span>{trailer.name}</span>
-                      <a
-                        href={`https://www.youtube.com/watch?v=${encodeURIComponent(trailer.key)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Abrir no YouTube <ExternalLink size={13} />
-                      </a>
-                    </div>
-                  </>
+                  <TrailerFrame trailer={trailer} title={draft.title} />
                 ) : (
                   <div className="trailer-state">
                     {trailerEntry?.error
@@ -238,6 +222,16 @@ export function TitleModal({ item, onClose, onSave, onDelete }: TitleModalProps)
               <h3>Notas da família</h3>
               <textarea value={draft.notes ?? ''} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} placeholder="O que vale lembrar? Sem spoilers, de preferência..." rows={3} />
             </section>
+
+            {draft.tmdbId && (
+              <SimilarTitles
+                tmdbId={draft.tmdbId}
+                mediaType={draft.mediaType}
+                findInList={findInList}
+                onOpenItem={onOpenItem}
+                onPreview={onPreview}
+              />
+            )}
           </div>
           <aside className="detail-aside">
             <h3>Sobre</h3>

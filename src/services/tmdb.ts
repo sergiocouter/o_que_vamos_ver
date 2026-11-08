@@ -38,7 +38,11 @@ export async function searchTitles(query: string): Promise<SearchResult[]> {
     throw new Error(payload?.error ?? 'Não foi possível consultar o catálogo agora.')
   }
   const payload = (await response.json()) as { results: TmdbSearchItem[] }
-  return payload.results
+  return toSearchResults(payload.results)
+}
+
+function toSearchResults(items: TmdbSearchItem[]): SearchResult[] {
+  return items
     .filter((item) => item.media_type === 'movie' || item.media_type === 'tv')
     .map((item) => ({
       tmdbId: item.id,
@@ -54,6 +58,26 @@ export async function searchTitles(query: string): Promise<SearchResult[]> {
       genreIds: item.genre_ids ?? [],
       popularity: item.popularity,
     }))
+}
+
+// "Parecidos com este": uma consulta por título enquanto o app está aberto.
+const similarCache = new Map<string, Promise<SearchResult[]>>()
+
+export function getSimilarTitles(tmdbId: number, mediaType: MediaType): Promise<SearchResult[]> {
+  const remoteType = mediaType === 'movie' ? 'movie' : 'tv'
+  const key = `${remoteType}:${tmdbId}`
+  let request = similarCache.get(key)
+  if (!request) {
+    request = fetch(`/.netlify/functions/tmdb?action=similar&type=${remoteType}&id=${tmdbId}`).then(async (response) => {
+      if (!response.ok) throw new Error('Não foi possível buscar títulos parecidos agora.')
+      const payload = (await response.json()) as { results?: TmdbSearchItem[] }
+      return toSearchResults(payload.results ?? [])
+    })
+    // Falha não fica guardada: a próxima abertura tenta de novo.
+    request.catch(() => similarCache.delete(key))
+    similarCache.set(key, request)
+  }
+  return request
 }
 
 type TmdbDetails = {

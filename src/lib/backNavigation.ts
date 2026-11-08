@@ -28,6 +28,18 @@ export function pushOverlay(kind: OverlayKind, search = '') {
   window.history.pushState({ oqvv: 'overlay', kind }, '', `${window.location.pathname}${search}`)
 }
 
+/**
+ * Troca a janela aberta por outra no mesmo passo do histórico (ex.: de um título para a prévia de
+ * um parecido): o voltar continua fechando de uma vez e voltando para a lista.
+ */
+export function replaceOverlay(kind: OverlayKind, search = '') {
+  if (!isOnOverlayEntry()) {
+    pushOverlay(kind, search)
+    return
+  }
+  window.history.replaceState({ oqvv: 'overlay', kind }, '', `${window.location.pathname}${search}`)
+}
+
 /** Recoloca o guard depois do primeiro voltar na tela inicial. */
 export function restoreGuard() {
   window.history.pushState({ oqvv: 'guard' }, '', window.location.pathname)

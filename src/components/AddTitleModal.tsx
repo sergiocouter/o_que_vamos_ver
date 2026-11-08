@@ -5,10 +5,13 @@ import { errorMessage } from '../lib/errors'
 import type { LibraryItem, MediaType, SearchResult, WatchStatus } from '../types'
 import { MEDIA_LABELS, STATUS_LABELS } from '../types'
 import { Poster } from './Poster'
+import { PreviewTrailer } from './TrailerFrame'
 
 interface AddTitleModalProps {
   onClose: () => void
   onAdd: (item: LibraryItem) => Promise<void>
+  /** Abre direto na etapa "Como vamos salvar?" (ex.: vindo de "Parecidos com este"). */
+  initialSelection?: SearchResult
 }
 
 const REALITY_GENRE_ID = 10764
@@ -18,11 +21,11 @@ const inferredMediaType = (result: SearchResult): MediaType => {
   return result.genreIds.includes(REALITY_GENRE_ID) ? 'reality' : 'tv'
 }
 
-export function AddTitleModal({ onClose, onAdd }: AddTitleModalProps) {
+export function AddTitleModal({ onClose, onAdd, initialSelection }: AddTitleModalProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
-  const [selected, setSelected] = useState<SearchResult | null>(null)
-  const [mediaType, setMediaType] = useState<MediaType>('movie')
+  const [selected, setSelected] = useState<SearchResult | null>(initialSelection ?? null)
+  const [mediaType, setMediaType] = useState<MediaType>(() => (initialSelection ? inferredMediaType(initialSelection) : 'movie'))
   const [status, setStatus] = useState<WatchStatus>('watchlist')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -119,6 +122,7 @@ export function AddTitleModal({ onClose, onAdd }: AddTitleModalProps) {
                 <p className="clamped-overview">{selected.overview || 'Sem sinopse disponível.'}</p>
               </div>
             </div>
+            <PreviewTrailer tmdbId={selected.tmdbId} mediaType={selected.mediaType} title={selected.title} />
             <div className="auto-media-type">
               <span className="auto-media-icon"><Sparkles size={18} /></span>
               <span><small>TIPO IDENTIFICADO</small><strong>{MEDIA_LABELS[mediaType]}</strong></span>
